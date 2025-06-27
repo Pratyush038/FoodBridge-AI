@@ -50,7 +50,7 @@ FoodBridge AI is an intelligent platform that connects surplus food providers, s
               <span className="font-semibold text-xl">1. Access Live Donation Listings</span>
             </div>
             <p className="ml-14 text-gray-700 text-lg max-w-3xl">
-              Once you log in, you'll see a live dashboard of available food donations tailored to your location and needs. Each listing includes:
+              Once you log in, you&#39;ll see a live dashboard of available food donations tailored to your location and needs. Each listing includes:
             </p>
             <ul className="ml-20 mt-2 list-disc text-gray-600 text-base max-w-3xl">
               <li>Food type and quantity</li>

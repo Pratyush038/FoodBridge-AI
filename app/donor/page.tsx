@@ -17,6 +17,7 @@ import { Upload, History, TrendingUp, Users, MapPin, Clock, Bell, Plus, External
 import { getDonationsByDonor, listenToActiveRequirements, FoodDonation } from '@/lib/firebase-service';
 import { MapMarker } from '@/lib/maps';
 import { toast } from 'sonner';
+import Image from 'next/image';
 
 // Lazy load heavy components
 const FoodUploadForm = dynamic(() => import('@/components/food-upload-form'), {
@@ -516,10 +517,12 @@ export default function DonorDashboard() {
                                   {donation.imageUrl && (
                                     <div className="mt-3">
                                       <p className="text-sm font-medium text-gray-700 mb-2">Donation Image</p>
-                                      <img 
+                                      <Image 
                                         src={donation.imageUrl} 
                                         alt={donation.foodType}
                                         className="w-24 h-24 object-cover rounded-lg border"
+                                        width={96}
+                                        height={96}
                                       />
                                     </div>
                                   )}

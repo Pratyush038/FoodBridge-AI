@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -65,7 +65,7 @@ export default function MapComponent({
     }
   };
 
-  const applyFilters = () => {
+  const applyFilters = useCallback(() => {
     let filtered = markers;
 
     // Filter by type
@@ -91,11 +91,11 @@ export default function MapComponent({
     }
 
     setFilteredMarkers(filtered);
-  };
+  }, [markerType, searchRadius, userLocation, markers]);
 
   useEffect(() => {
     applyFilters();
-  }, [markerType, searchRadius, userLocation, markers, applyFilters]);
+  }, [applyFilters]);
 
   return (
     <Card className="w-full">

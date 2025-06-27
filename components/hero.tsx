@@ -8,6 +8,7 @@ import { ArrowRight, Heart, Utensils, Building } from 'lucide-react';
 import { motion, useInView, useSpring, Variants, useTransform } from 'framer-motion';
 import { useRef, FC } from 'react';
 import { LucideProps } from 'lucide-react';
+import Image from 'next/image';
 
 interface AnimatedNumberProps {
   value: number;
@@ -61,7 +62,7 @@ export default function Hero() {
     // Simulating a fetch for stats to make it feel more real
     const timer = setTimeout(() => {
       // In a real scenario, you would call getAnalyticsData()
-      // For now, we'll just use slightly higher numbers to show change
+      // For now, we&#39;ll just use slightly higher numbers to show change
       setStats({
         donations: 1573,
         mealsServed: 452108,
@@ -143,7 +144,13 @@ export default function Hero() {
             </motion.div>
           </div>
           <motion.div className="hidden md:block" variants={rightVariants}>
-            <img src="/happy-photo.png" alt="Happy people sharing food" className="rounded-lg shadow-2xl"/>
+            <Image 
+              src="/happy-photo.png" 
+              alt="Happy people sharing food" 
+              className="rounded-lg shadow-2xl"
+              width={600}
+              height={400}
+            />
           </motion.div>
         </div>
 

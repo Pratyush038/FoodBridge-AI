@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -31,51 +31,52 @@ export default function AIMatchingDashboard({
   const [loading, setLoading] = useState(false);
   const [classifyingImage, setClassifyingImage] = useState(false);
 
-  useEffect(() => {
-    generateMatches();
+  const generateMatches = useCallback(async () => {
     if (userRole === 'donor') {
+      try {
+        const predictions = await aiMatchingEngine.predictMatches(donations, requirements);
+        setMatches(predictions.slice(0, 10)); // Show top 10 matches
+      } catch (error) {
+        console.error('Error generating matches:', error);
+      }
+    }
+  }, [userRole, donations, requirements]);
+
+  const loadGamificationData = useCallback(async () => {
+    if (userRole === 'donor') {
+      try {
+        // Simulate loading donor stats
+        const donorStats = {
+          totalDonations: donations.filter(d => d.donorId === userId).length,
+          consistencyScore: 75,
+          monthlyDonations: 5,
+          peopleFed: 150,
+          wasteReduced: 25
+        };
+
+        const tier = aiMatchingEngine.calculateDonorTier(
+          donorStats.totalDonations,
+          donorStats.consistencyScore
+        );
+        setDonorTier(tier);
+
+        // Generate rewards
+        const reward = await gamificationService.generateReward(userId, tier);
+        if (reward) {
+          setRewards([reward]);
+        }
+      } catch (error) {
+        console.error('Error loading gamification data:', error);
+      }
+    }
+  }, [userRole, donations, userId]);
+
+  useEffect(() => {
+    if (userRole) {
+      generateMatches();
       loadGamificationData();
     }
-  }, [donations, requirements]);
-
-  const generateMatches = async () => {
-    setLoading(true);
-    try {
-      const predictions = await aiMatchingEngine.predictMatches(donations, requirements);
-      setMatches(predictions.slice(0, 10)); // Show top 10 matches
-    } catch (error) {
-      console.error('Error generating matches:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadGamificationData = async () => {
-    try {
-      // Simulate loading donor stats
-      const donorStats = {
-        totalDonations: donations.filter(d => d.donorId === userId).length,
-        consistencyScore: 75,
-        monthlyDonations: 5,
-        peopleFed: 150,
-        wasteReduced: 25
-      };
-
-      const tier = aiMatchingEngine.calculateDonorTier(
-        donorStats.totalDonations,
-        donorStats.consistencyScore
-      );
-      setDonorTier(tier);
-
-      // Generate rewards
-      const reward = await gamificationService.generateReward(userId, tier);
-      if (reward) {
-        setRewards([reward]);
-      }
-    } catch (error) {
-      console.error('Error loading gamification data:', error);
-    }
-  };
+  }, [userRole, generateMatches, loadGamificationData]);
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -161,7 +162,7 @@ export default function AIMatchingDashboard({
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="matches">Smart Matches</TabsTrigger>
           <TabsTrigger value="image-ai">Image Recognition</TabsTrigger>
-          {userRole === 'donor' && <TabsTrigger value="gamification">Rewards & Badges</TabsTrigger>}
+          {userRole === 'donor' && <TabsTrigger value="gamification">Rewards &amp; Badges</TabsTrigger>}
           <TabsTrigger value="insights">AI Insights</TabsTrigger>
         </TabsList>
 

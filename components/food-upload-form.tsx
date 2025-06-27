@@ -54,7 +54,7 @@ export default function FoodUploadForm({ onSuccess }: FoodUploadFormProps) {
 
   // Save form data to localStorage whenever it changes
   useEffect(() => {
-    // We don't save the file object, only the data URL for preview
+    // We don&#39;t save the file object, only the data URL for preview
     const dataToSave = { ...formData, image: null };
     localStorage.setItem('foodDonationFormData', JSON.stringify(dataToSave));
   }, [formData]);

@@ -21,7 +21,9 @@ export default function AuthWrapper({
   const [isTransitioning, setIsTransitioning] = useState(false);
 
   useEffect(() => {
-    if (status === 'loading') return;
+    if (status === 'loading' || isTransitioning) {
+      return;
+    }
 
     const userRole = session?.user ? (session.user as any)?.role : null;
 
@@ -71,7 +73,7 @@ export default function AuthWrapper({
 
     console.log('✅ AuthWrapper: Access granted');
     setIsTransitioning(false);
-  }, [session, status, requiredRole, router, redirectTo]);
+  }, [session, status, requiredRole, router, redirectTo, isTransitioning]);
 
   if (status === 'loading' || isTransitioning) {
     return (

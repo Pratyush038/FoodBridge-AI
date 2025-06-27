@@ -1,6 +1,6 @@
 # FoodBridge AI
 
-An AI-powered platform connecting food donors with NGOs and shelters to reduce waste and fight hunger.
+FoodBridge AI is an intelligent platform that connects surplus food providers, such as restaurants, grocers, and event organisers, with verified recipients through a network of NGOs, shelters, and community kitchens. Powered by automation and smart logistics, it ensures timely, efficient, and equitable food distribution, reducing waste and fighting hunger at scale.
 
 ## Features
 
@@ -19,7 +19,6 @@ An AI-powered platform connecting food donors with NGOs and shelters to reduce w
 - **Database**: Firebase Realtime Database
 - **Maps**: Mapbox GL JS
 - **Charts**: Recharts
-- **Deployment**: Vercel-ready
 
 ## Getting Started
 
@@ -35,8 +34,8 @@ An AI-powered platform connecting food donors with NGOs and shelters to reduce w
 
 1. **Clone the repository**
    ```bash
-   git clone <repository-url>
-   cd FoodBridgeAI
+   git clone https://github.com/Pratyush038/FoodBridge-AI
+   cd FoodBridge-AI
    ```
 
 2. **Install dependencies**
@@ -135,7 +134,6 @@ FoodBridgeAI/
 │   ├── about.tsx         # About section
 │   ├── auth-wrapper.tsx  # Authentication wrapper
 │   ├── hero.tsx          # Hero section
-│   ├── navigation.tsx    # Navigation component
 │   └── ...               # Other components
 ├── lib/                  # Utility libraries
 │   ├── auth-config.ts    # NextAuth configuration
@@ -179,19 +177,3 @@ FoodBridgeAI/
 ### Other Platforms
 
 The app is configured for Vercel deployment but can be adapted for other platforms by updating the `next.config.js` file.
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
-
-## License
-
-This project is licensed under the MIT License.
-
-## Support
-
-For support, email support@foodbridge.ai or create an issue in the repository. 

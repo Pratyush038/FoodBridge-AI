@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowRight, Heart, Utensils, Building, Zap } from 'lucide-react';
 import { motion, useInView, useSpring, Variants, useTransform } from 'framer-motion';
 import { useRef, FC } from 'react';
-import { LucideProps } from 'lucide-react';
+import { LucideCrop as LucideProps } from 'lucide-react';
 import Image from 'next/image';
 
 interface AnimatedNumberProps {

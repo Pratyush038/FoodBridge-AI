@@ -4,7 +4,8 @@ import GoogleProvider from 'next-auth/providers/google';
 import { 
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword,
-  getAuth 
+  signInWithPopup,
+  GoogleAuthProvider
 } from 'firebase/auth';
 import { ref, set, get } from 'firebase/database';
 import { auth, database } from './firebase';
@@ -25,14 +26,14 @@ export interface User {
 }
 
 export const authOptions: NextAuthOptions = {
-  secret: process.env.NEXTAUTH_SECRET,
+  secret: process.env.NEXTAUTH_SECRET || 'fallback-secret-for-development',
   providers: [
     CredentialsProvider({
       name: 'credentials',
       credentials: {
         email: { label: 'Email', type: 'email' },
         password: { label: 'Password', type: 'password' },
-        action: { label: 'Action', type: 'text' }, // 'login' or 'register'
+        action: { label: 'Action', type: 'text' },
         name: { label: 'Name', type: 'text' },
         role: { label: 'Role', type: 'text' },
         organizationName: { label: 'Organization', type: 'text' }
@@ -71,24 +72,22 @@ export const authOptions: NextAuthOptions = {
             
             console.log('✅ User created in Firebase Auth:', userData);
             
-            // Try to save user data to database, but don't fail if database is not available
+            // Try to save user data to database
             try {
-              await set(ref(database, `users/${userCredential.user.uid}`), userData);
-              console.log('✅ User data saved to database');
+              if (database && typeof database === 'object') {
+                await set(ref(database, `users/${userCredential.user.uid}`), userData);
+                console.log('✅ User data saved to database');
+              }
             } catch (dbError) {
               console.warn('⚠️ Database not available, user created in Auth only:', dbError);
-              // Continue without database - user is still created in Firebase Auth
             }
             
-            const returnUser = {
+            return {
               id: userData.id,
               email: userData.email,
               name: userData.name,
               role: userData.role
             };
-            
-            console.log('🎉 Registration successful, returning user:', returnUser);
-            return returnUser;
           } else {
             console.log('🔑 Logging in user:', credentials.email);
             
@@ -101,71 +100,61 @@ export const authOptions: NextAuthOptions = {
             
             console.log('✅ Firebase Auth login successful');
             
-            // Try to get user data from database, but don't fail if database is not available
+            // Try to get user data from database
             let userData: User | null = null;
             try {
-              const userSnapshot = await get(ref(database, `users/${userCredential.user.uid}`));
-              userData = userSnapshot.val() as User;
-              console.log('✅ User data retrieved from database:', userData);
+              if (database && typeof database === 'object') {
+                const userSnapshot = await get(ref(database, `users/${userCredential.user.uid}`));
+                userData = userSnapshot.val() as User;
+                console.log('✅ User data retrieved from database:', userData);
+              }
             } catch (dbError) {
               console.warn('⚠️ Database not available, using basic user info:', dbError);
-              // Create basic user data if database is not available
-              userData = {
-                id: userCredential.user.uid,
-                email: userCredential.user.email || credentials.email,
-                name: userCredential.user.displayName || 'User',
-                role: 'donor', // Default role
-                verified: false,
-                createdAt: new Date().toISOString()
-              };
             }
             
             if (!userData) {
               console.log('⚠️ No user data found, creating default user data');
-              // Create default user data if none exists
               userData = {
                 id: userCredential.user.uid,
                 email: userCredential.user.email || credentials.email,
                 name: userCredential.user.displayName || 'User',
-                role: 'donor', // Default role
+                role: 'donor',
                 verified: false,
                 createdAt: new Date().toISOString()
               };
             }
             
-            const returnUser = {
+            return {
               id: userData.id,
               email: userData.email,
               name: userData.name,
               role: userData.role
             };
-            
-            console.log('🎉 Login successful, returning user:', returnUser);
-            return returnUser;
           }
         } catch (error: any) {
           console.error('❌ Authentication error:', error);
-          if (error.code === 'auth/user-not-found') {
-            throw new Error('User not found. Please check your email and password.');
-          } else if (error.code === 'auth/wrong-password') {
-            throw new Error('Incorrect password. Please try again.');
-          } else if (error.code === 'auth/email-already-in-use') {
-            throw new Error('An account with this email already exists.');
-          } else if (error.code === 'auth/weak-password') {
-            throw new Error('Password is too weak. Please choose a stronger password.');
-          } else if (error.code === 'auth/invalid-email') {
-            throw new Error('Invalid email address.');
-          } else if (error.code === 'auth/network-request-failed') {
-            throw new Error('Network error. Please check your internet connection and try again.');
-          } else {
-            throw new Error(error.message || 'Authentication failed. Please try again.');
-          }
+          
+          // Provide user-friendly error messages
+          const errorMessages: Record<string, string> = {
+            'auth/user-not-found': 'No account found with this email address.',
+            'auth/wrong-password': 'Incorrect password. Please try again.',
+            'auth/email-already-in-use': 'An account with this email already exists.',
+            'auth/weak-password': 'Password should be at least 6 characters.',
+            'auth/invalid-email': 'Please enter a valid email address.',
+            'auth/network-request-failed': 'Network error. Please check your connection.',
+            'auth/too-many-requests': 'Too many failed attempts. Please try again later.',
+            'auth/user-disabled': 'This account has been disabled.',
+            'auth/operation-not-allowed': 'This sign-in method is not enabled.',
+          };
+          
+          const userMessage = errorMessages[error.code] || error.message || 'Authentication failed. Please try again.';
+          throw new Error(userMessage);
         }
       }
     }),
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID || 'demo-client-id',
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || 'demo-client-secret',
+      clientId: process.env.GOOGLE_CLIENT_ID || '',
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
     })
   ],
   callbacks: {
@@ -179,25 +168,49 @@ export const authOptions: NextAuthOptions = {
       // For Google OAuth users, assign a default role if none exists
       if (account?.provider === 'google' && !(user as any).role) {
         console.log('👤 Assigning default role to Google user');
-        (user as any).role = 'donor'; // Default role for Google users
+        (user as any).role = 'donor';
+        
+        // Try to save Google user to database
+        try {
+          if (database && typeof database === 'object' && user.id) {
+            const userData: User = {
+              id: user.id,
+              email: user.email || '',
+              name: user.name || '',
+              role: 'donor',
+              verified: true, // Google users are pre-verified
+              createdAt: new Date().toISOString()
+            };
+            
+            await set(ref(database, `users/${user.id}`), userData);
+            console.log('✅ Google user saved to database');
+          }
+        } catch (error) {
+          console.warn('⚠️ Could not save Google user to database:', error);
+        }
       }
       
       return true;
     },
     async jwt({ token, user, account }) {
-      console.log('🔄 JWT callback:', { token: token.sub, user: user?.email, provider: account?.provider });
+      console.log('🔄 JWT callback:', { 
+        tokenSub: token.sub, 
+        userEmail: user?.email, 
+        provider: account?.provider 
+      });
       
       if (user) {
-        // Ensure user has a role, default to 'donor' if none
         const userRole = (user as any).role || 'donor';
         token.role = userRole;
+        token.name = user.name;
+        token.email = user.email;
         console.log('✅ Role added to token:', token.role);
       }
       
-      // For Google OAuth, ensure role is set even if not in user object
-      if (account?.provider === 'google' && !token.role) {
+      // Ensure role is always present
+      if (!token.role) {
         token.role = 'donor';
-        console.log('✅ Default role set for Google user:', token.role);
+        console.log('✅ Default role set in token:', token.role);
       }
       
       return token;
@@ -206,16 +219,16 @@ export const authOptions: NextAuthOptions = {
       console.log('🔄 Session callback:', { 
         sessionUser: session.user?.email, 
         tokenRole: token.role,
-        tokenSub: token.sub,
-        hasUser: !!session.user
+        tokenSub: token.sub 
       });
       
-      if (session.user) {
+      if (session.user && token.sub) {
         (session.user as any).id = token.sub;
+        (session.user as any).role = token.role || 'donor';
         
-        // Use the role from the token, default to 'donor'
-        const userRole = token.role || 'donor';
-        (session.user as any).role = userRole;
+        // Ensure name and email are set
+        session.user.name = token.name as string || session.user.name;
+        session.user.email = token.email as string || session.user.email;
         
         console.log('✅ Session updated with user data:', {
           id: (session.user as any).id,
@@ -223,8 +236,6 @@ export const authOptions: NextAuthOptions = {
           name: session.user.name,
           role: (session.user as any).role
         });
-      } else {
-        console.warn('⚠️ Session callback: No user in session object');
       }
       
       return session;
@@ -232,9 +243,22 @@ export const authOptions: NextAuthOptions = {
   },
   pages: {
     signIn: '/login',
+    error: '/login',
   },
   session: {
-    strategy: 'jwt'
+    strategy: 'jwt',
+    maxAge: 30 * 24 * 60 * 60, // 30 days
   },
-  debug: process.env.NODE_ENV === 'development'
+  debug: process.env.NODE_ENV === 'development',
+  events: {
+    async signIn(message) {
+      console.log('🎉 User signed in:', message.user.email);
+    },
+    async signOut(message) {
+      console.log('👋 User signed out:', message.token?.email);
+    },
+    async createUser(message) {
+      console.log('👤 New user created:', message.user.email);
+    },
+  },
 };

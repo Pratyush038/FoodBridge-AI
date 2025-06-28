@@ -21,6 +21,8 @@ const nextConfig = {
       { protocol: 'https', hostname: 'riseagainsthungerindia.org' },
     ],
     formats: ['image/webp', 'image/avif'],
+    dangerouslyAllowSVG: true,
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
   },
   webpack: (config, { dev, isServer }) => {
     // Optimize bundle size
@@ -60,6 +62,14 @@ const nextConfig = {
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production',
   },
+  // Add error handling
+  onDemandEntries: {
+    maxInactiveAge: 25 * 1000,
+    pagesBufferLength: 2,
+  },
+  // Improve performance
+  productionBrowserSourceMaps: false,
+  optimizeFonts: true,
 };
 
 module.exports = nextConfig;

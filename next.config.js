@@ -3,7 +3,6 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ['undici'],
   },
-  transpilePackages: ['undici'],
   webpack: (config, { dev, isServer }) => {
     // Fix for undici compatibility
     if (!isServer) {

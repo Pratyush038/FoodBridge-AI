@@ -225,6 +225,11 @@ const authOptions: NextAuthOptions = {
   debug: process.env.NODE_ENV === 'development',
 };
 
-const handler = NextAuth(authOptions);
+// Wrap NextAuth in request handlers to avoid calling cookies() globally
+export async function GET(request: Request) {
+  return NextAuth(authOptions)(request);
+}
 
-export { handler as GET, handler as POST };
+export async function POST(request: Request) {
+  return NextAuth(authOptions)(request);
+}

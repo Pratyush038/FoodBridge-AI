@@ -18,15 +18,22 @@ const hasValidConfig = firebaseConfig.apiKey !== 'demo-api-key' &&
                       firebaseConfig.projectId !== 'demo-project';
 
 if (!hasValidConfig) {
-  console.warn('⚠️ Firebase configuration not found. Using mock data mode.');
+  console.log('🔧 Running in demo mode with mock data');
 }
 
 // Initialize Firebase only if not already initialized
 let app: FirebaseApp;
-if (getApps().length === 0) {
-  app = initializeApp(firebaseConfig);
-} else {
+if (typeof window !== 'undefined' && getApps().length === 0) {
+  try {
+    app = initializeApp(firebaseConfig);
+  } catch (error) {
+    console.warn('Firebase initialization failed, using mock mode:', error);
+    app = {} as FirebaseApp;
+  }
+} else if (typeof window !== 'undefined') {
   app = getApps()[0];
+} else {
+  app = {} as FirebaseApp;
 }
 
 // Initialize Firebase services with error handling
@@ -35,12 +42,18 @@ let auth: Auth;
 let storage: FirebaseStorage;
 
 try {
-  database = getDatabase(app);
-  auth = getAuth(app);
-  storage = getStorage(app);
+  if (typeof window !== 'undefined' && hasValidConfig) {
+    database = getDatabase(app);
+    auth = getAuth(app);
+    storage = getStorage(app);
+  } else {
+    // Create mock objects to prevent crashes
+    database = {} as Database;
+    auth = {} as Auth;
+    storage = {} as FirebaseStorage;
+  }
 } catch (error) {
-  console.error('Error initializing Firebase services:', error);
-  // Create mock objects to prevent crashes
+  console.warn('Firebase services initialization failed, using mock mode:', error);
   database = {} as Database;
   auth = {} as Auth;
   storage = {} as FirebaseStorage;

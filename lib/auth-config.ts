@@ -1,14 +1,6 @@
 import NextAuth, { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import GoogleProvider from 'next-auth/providers/google';
-import { 
-  createUserWithEmailAndPassword, 
-  signInWithEmailAndPassword,
-  signInWithPopup,
-  GoogleAuthProvider
-} from 'firebase/auth';
-import { ref, set, get } from 'firebase/database';
-import { auth, database } from './firebase';
 
 export interface User {
   id: string;
@@ -24,6 +16,37 @@ export interface User {
   verified: boolean;
   createdAt: string;
 }
+
+// Mock user database for demo
+const mockUsers: Record<string, User> = {
+  'donor@demo.com': {
+    id: 'donor-1',
+    email: 'donor@demo.com',
+    name: 'Demo Donor',
+    role: 'donor',
+    organizationName: 'Green Restaurant',
+    verified: true,
+    createdAt: new Date().toISOString()
+  },
+  'receiver@demo.com': {
+    id: 'receiver-1',
+    email: 'receiver@demo.com',
+    name: 'Demo Receiver',
+    role: 'receiver',
+    organizationName: 'Community Shelter',
+    verified: true,
+    createdAt: new Date().toISOString()
+  },
+  'admin@demo.com': {
+    id: 'admin-1',
+    email: 'admin@demo.com',
+    name: 'Demo Admin',
+    role: 'admin',
+    organizationName: 'FoodBridge AI',
+    verified: true,
+    createdAt: new Date().toISOString()
+  }
+};
 
 export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET || 'fallback-secret-for-development',
@@ -53,34 +76,24 @@ export const authOptions: NextAuthOptions = {
           if (credentials.action === 'register') {
             console.log('📝 Registering new user:', credentials.email);
             
-            // Create new user
-            const userCredential = await createUserWithEmailAndPassword(
-              auth,
-              credentials.email,
-              credentials.password
-            );
+            // Check if user already exists
+            if (mockUsers[credentials.email]) {
+              throw new Error('User already exists');
+            }
             
             const userData: User = {
-              id: userCredential.user.uid,
+              id: `user-${Date.now()}`,
               email: credentials.email,
               name: credentials.name || '',
               role: (credentials.role as 'donor' | 'receiver' | 'admin') || 'donor',
               organizationName: credentials.organizationName || undefined,
-              verified: false,
+              verified: true,
               createdAt: new Date().toISOString()
             };
             
-            console.log('✅ User created in Firebase Auth:', userData);
-            
-            // Try to save user data to database
-            try {
-              if (database && typeof database === 'object') {
-                await set(ref(database, `users/${userCredential.user.uid}`), userData);
-                console.log('✅ User data saved to database');
-              }
-            } catch (dbError) {
-              console.warn('⚠️ Database not available, user created in Auth only:', dbError);
-            }
+            // Save to mock database
+            mockUsers[credentials.email] = userData;
+            console.log('✅ User registered:', userData);
             
             return {
               id: userData.id,
@@ -91,70 +104,51 @@ export const authOptions: NextAuthOptions = {
           } else {
             console.log('🔑 Logging in user:', credentials.email);
             
-            // Sign in existing user
-            const userCredential = await signInWithEmailAndPassword(
-              auth,
-              credentials.email,
-              credentials.password
-            );
-            
-            console.log('✅ Firebase Auth login successful');
-            
-            // Try to get user data from database
-            let userData: User | null = null;
-            try {
-              if (database && typeof database === 'object') {
-                const userSnapshot = await get(ref(database, `users/${userCredential.user.uid}`));
-                userData = userSnapshot.val() as User;
-                console.log('✅ User data retrieved from database:', userData);
-              }
-            } catch (dbError) {
-              console.warn('⚠️ Database not available, using basic user info:', dbError);
-            }
-            
-            if (!userData) {
-              console.log('⚠️ No user data found, creating default user data');
-              userData = {
-                id: userCredential.user.uid,
-                email: userCredential.user.email || credentials.email,
-                name: userCredential.user.displayName || 'User',
-                role: 'donor',
-                verified: false,
-                createdAt: new Date().toISOString()
+            // Check mock users first
+            const mockUser = mockUsers[credentials.email];
+            if (mockUser && credentials.password === 'demo123') {
+              console.log('✅ Mock user login successful:', mockUser);
+              return {
+                id: mockUser.id,
+                email: mockUser.email,
+                name: mockUser.name,
+                role: mockUser.role
               };
             }
             
-            return {
-              id: userData.id,
-              email: userData.email,
-              name: userData.name,
-              role: userData.role
-            };
+            // For any other email/password combination, create a demo user
+            if (credentials.password === 'demo123') {
+              const newUser: User = {
+                id: `user-${Date.now()}`,
+                email: credentials.email,
+                name: credentials.email.split('@')[0],
+                role: 'donor',
+                verified: true,
+                createdAt: new Date().toISOString()
+              };
+              
+              mockUsers[credentials.email] = newUser;
+              console.log('✅ Demo user created and logged in:', newUser);
+              
+              return {
+                id: newUser.id,
+                email: newUser.email,
+                name: newUser.name,
+                role: newUser.role
+              };
+            }
+            
+            throw new Error('Invalid credentials. Use password: demo123');
           }
         } catch (error: any) {
           console.error('❌ Authentication error:', error);
-          
-          // Provide user-friendly error messages
-          const errorMessages: Record<string, string> = {
-            'auth/user-not-found': 'No account found with this email address.',
-            'auth/wrong-password': 'Incorrect password. Please try again.',
-            'auth/email-already-in-use': 'An account with this email already exists.',
-            'auth/weak-password': 'Password should be at least 6 characters.',
-            'auth/invalid-email': 'Please enter a valid email address.',
-            'auth/network-request-failed': 'Network error. Please check your connection.',
-            'auth/too-many-requests': 'Too many failed attempts. Please try again later.',
-            'auth/user-disabled': 'This account has been disabled.',
-            'auth/operation-not-allowed': 'This sign-in method is not enabled.',
-          };
-          
-          const userMessage = errorMessages[error.code] || error.message || 'Authentication failed. Please try again.';
-          throw new Error(userMessage);
+          throw new Error(error.message || 'Authentication failed');
         }
       }
     }),
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID || '',
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+      clientId: process.env.GOOGLE_CLIENT_ID || 'demo-client-id',
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || 'demo-client-secret',
     })
   ],
   callbacks: {
@@ -170,23 +164,16 @@ export const authOptions: NextAuthOptions = {
         console.log('👤 Assigning default role to Google user');
         (user as any).role = 'donor';
         
-        // Try to save Google user to database
-        try {
-          if (database && typeof database === 'object' && user.id) {
-            const userData: User = {
-              id: user.id,
-              email: user.email || '',
-              name: user.name || '',
-              role: 'donor',
-              verified: true, // Google users are pre-verified
-              createdAt: new Date().toISOString()
-            };
-            
-            await set(ref(database, `users/${user.id}`), userData);
-            console.log('✅ Google user saved to database');
-          }
-        } catch (error) {
-          console.warn('⚠️ Could not save Google user to database:', error);
+        // Save Google user to mock database
+        if (user.email) {
+          mockUsers[user.email] = {
+            id: user.id || `google-${Date.now()}`,
+            email: user.email,
+            name: user.name || '',
+            role: 'donor',
+            verified: true,
+            createdAt: new Date().toISOString()
+          };
         }
       }
       
@@ -250,15 +237,4 @@ export const authOptions: NextAuthOptions = {
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   debug: process.env.NODE_ENV === 'development',
-  events: {
-    async signIn(message) {
-      console.log('🎉 User signed in:', message.user.email);
-    },
-    async signOut(message) {
-      console.log('👋 User signed out:', message.token?.email);
-    },
-    async createUser(message) {
-      console.log('👤 New user created:', message.user.email);
-    },
-  },
 };

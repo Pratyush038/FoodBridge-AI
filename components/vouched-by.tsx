@@ -1,14 +1,13 @@
 "use client";
 
 import { motion } from 'framer-motion';
-import Image from 'next/image';
 
 const logos = [
-  { name: 'Akshaya Patra', logo: '/akshaya-patra-logo.png', url: 'https://www.akshayapatra.org' },
-  { name: 'Uday Foundation', logo: '/uday-foundation-logo.png', url: 'https://www.udayfoundation.org' },
-  { name: 'Annamrita', logo: '/annamrita-logo.png', url: 'https://www.annamrita.org' },
-  { name: 'Feeding India', logo: '/feeding-india-logo.png', url: 'https://www.feedingindia.org' },
-  { name: 'Rise Against Hunger India', logo: '/rise-india-logo.png', url: 'https://www.riseagainsthungerindia.org' }
+  { name: 'Akshaya Patra', logo: '🍽️', description: 'Mid-day meal program' },
+  { name: 'Uday Foundation', logo: '🌅', description: 'Community development' },
+  { name: 'Annamrita', logo: '🍚', description: 'Food for education' },
+  { name: 'Feeding India', logo: '🇮🇳', description: 'Hunger relief' },
+  { name: 'Rise Against Hunger', logo: '✊', description: 'Global hunger relief' }
 ];
 
 export default function VouchedBy() {
@@ -42,20 +41,15 @@ export default function VouchedBy() {
               whileInView={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.5, delay: index * 0.1 }}
               whileHover={{ scale: 1.05 }}
-              className="flex justify-center"
+              className="flex flex-col items-center justify-center p-6 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow"
             >
-              <a href={company.url} target="_blank" rel="noopener noreferrer" className="block relative h-12 w-40">
-                <Image
-                  src={company.logo}
-                  alt={company.name}
-                  fill={true}
-                  style={{objectFit: 'contain'}}
-                />
-              </a>
+              <div className="text-4xl mb-2">{company.logo}</div>
+              <h3 className="font-semibold text-gray-900 text-center">{company.name}</h3>
+              <p className="text-sm text-gray-500 text-center mt-1">{company.description}</p>
             </motion.div>
           ))}
         </motion.div>
       </div>
     </section>
   );
-} 
+}

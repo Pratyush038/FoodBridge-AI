@@ -39,16 +39,83 @@ app.get('/health', (req, res) => {
   res.status(200).json({ 
     status: 'OK', 
     timestamp: new Date().toISOString(),
-    service: 'FoodBridge API'
+    service: 'FoodBridge API',
+    version: '1.0.0'
   });
 });
 
+// Mock data for demo
+const mockDonations = [
+  {
+    id: '1',
+    donorId: 'donor-1',
+    donorName: 'Green Restaurant',
+    foodType: 'fresh-produce',
+    quantity: '25',
+    unit: 'kg',
+    description: 'Fresh organic vegetables',
+    location: { address: '123 Main St', lat: 40.7128, lng: -74.0060 },
+    status: 'pending',
+    createdAt: new Date().toISOString()
+  }
+];
+
+const mockRequirements = [
+  {
+    id: '1',
+    receiverId: 'receiver-1',
+    organizationName: 'Community Shelter',
+    title: 'Daily Meal Program',
+    foodType: 'any',
+    quantity: '50',
+    unit: 'portions',
+    urgency: 'high',
+    status: 'active',
+    createdAt: new Date().toISOString()
+  }
+];
+
 // API Routes
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/donations', require('./routes/donations'));
-app.use('/api/requirements', require('./routes/requirements'));
-app.use('/api/matches', require('./routes/matches'));
-app.use('/api/analytics', require('./routes/analytics'));
+app.get('/api/donations', (req, res) => {
+  res.json(mockDonations);
+});
+
+app.get('/api/requirements', (req, res) => {
+  res.json(mockRequirements);
+});
+
+app.post('/api/donations', (req, res) => {
+  const newDonation = {
+    id: Date.now().toString(),
+    ...req.body,
+    createdAt: new Date().toISOString()
+  };
+  mockDonations.push(newDonation);
+  res.status(201).json({ message: 'Donation created', donation: newDonation });
+});
+
+app.post('/api/requirements', (req, res) => {
+  const newRequirement = {
+    id: Date.now().toString(),
+    ...req.body,
+    createdAt: new Date().toISOString()
+  };
+  mockRequirements.push(newRequirement);
+  res.status(201).json({ message: 'Requirement created', requirement: newRequirement });
+});
+
+app.get('/api/analytics', (req, res) => {
+  res.json({
+    donations: mockDonations,
+    requirements: mockRequirements,
+    matches: [],
+    stats: {
+      totalDonations: mockDonations.length,
+      totalRequirements: mockRequirements.length,
+      totalMatches: 0
+    }
+  });
+});
 
 // Error handling middleware
 app.use((err, req, res, next) => {

@@ -1,16 +1,31 @@
-# FoodBridge AI - Bolt Hackathon Submission
+# FoodBridge AI - Bolt Hackathon Submission 🏆
 
-FoodBridge AI is an intelligent platform that connects surplus food providers, such as restaurants, grocers, and event organisers, with verified recipients through a network of NGOs, shelters, and community kitchens. Powered by automation and smart logistics, it ensures timely, efficient, and equitable food distribution, reducing waste and fighting hunger at scale.
+**Built with Bolt** - An intelligent platform that connects surplus food providers with verified recipients through AI-powered matching and smart logistics.
 
-## 🚀 Features
+## 🚀 Live Demo
 
+The application is fully functional and ready for demonstration with mock data - no setup required!
+
+## 🎯 Hackathon Submission Highlights
+
+### ✅ Complete Features
+- **Multi-role Authentication**: Donor, Receiver, and Admin dashboards
 - **AI-Powered Matching**: Smart algorithms connect donors with nearby organizations
-- **Real-time Tracking**: Monitor donations and their impact
-- **Multi-role Support**: Donors, receivers, and administrators
-- **Interactive Maps**: Visualize donation locations and opportunities
+- **Real-time Updates**: Live donation tracking and notifications
+- **Interactive Maps**: Location-based food distribution visualization
 - **Analytics Dashboard**: Comprehensive insights and reporting
 - **Mobile Responsive**: Works seamlessly on all devices
-- **Offline Support**: Works with mock data when services are unavailable
+
+### ✅ Built with Bolt
+- **Rapid Development**: Leveraged Bolt's AI-powered development environment
+- **Modern Stack**: Next.js 14, React 18, TypeScript, Tailwind CSS
+- **Production Ready**: Error handling, loading states, and fallbacks
+- **Demo Ready**: Works with mock data for instant demonstration
+
+### ✅ Social Impact
+- **Food Waste Reduction**: Prevents surplus food from going to landfills
+- **Hunger Relief**: Connects food directly to those in need
+- **Community Building**: Strengthens local food security networks
 
 ## 🛠️ Tech Stack
 
@@ -22,33 +37,9 @@ FoodBridge AI is an intelligent platform that connects surplus food providers, s
 - **Charts**: Recharts
 - **Animations**: Framer Motion
 
-## 🎯 Hackathon Ready Features
-
-### ✅ Complete Functionality
-- **User Authentication**: Email/password and Google OAuth
-- **Role-based Dashboards**: Donor, Receiver, and Admin interfaces
-- **Food Upload System**: Complete donation management
-- **Requirements Posting**: Organizations can post food needs
-- **Real-time Matching**: AI-powered donor-receiver matching
-- **Interactive Maps**: Location-based food distribution
-- **Analytics**: Comprehensive reporting and insights
-
-### ✅ Production Ready
-- **Error Handling**: Comprehensive error boundaries and fallbacks
-- **Loading States**: Smooth loading experiences
-- **Responsive Design**: Works on all device sizes
-- **Performance Optimized**: Code splitting and lazy loading
-- **SEO Optimized**: Meta tags and structured data
-
-### ✅ Demo Ready
-- **Mock Data**: Works without external services
-- **Instant Setup**: No complex configuration required
-- **Visual Appeal**: Modern, professional design
-- **Interactive**: Fully functional demo experience
-
 ## 🚀 Quick Start
 
-### Option 1: Instant Demo (No Setup Required)
+### Instant Demo (No Setup Required)
 ```bash
 git clone https://github.com/your-repo/foodbridge-ai
 cd foodbridge-ai
@@ -56,10 +47,10 @@ npm install
 npm run dev
 ```
 
-The app will work immediately with mock data - perfect for demos!
+The app works immediately with mock data - perfect for hackathon demos!
 
-### Option 2: Full Setup (Optional)
-Create a `.env.local` file for enhanced features:
+### Enhanced Setup (Optional)
+Create a `.env.local` file for full features:
 
 ```env
 # Required for production
@@ -72,7 +63,6 @@ GOOGLE_CLIENT_SECRET=your-google-client-secret
 # Optional: Firebase (for real database)
 NEXT_PUBLIC_FIREBASE_API_KEY=your-firebase-api-key
 NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-project-id
-# ... other Firebase config
 
 # Optional: Mapbox (for real maps)
 NEXT_PUBLIC_MAPBOX_API_KEY=your-mapbox-api-key
@@ -136,25 +126,6 @@ The application includes realistic mock data:
 - **Real-time Updates**: Simulated live activity
 - **Analytics**: Meaningful charts and statistics
 
-## 🔧 Architecture
-
-### Frontend
-- **Next.js 14**: App router with server components
-- **TypeScript**: Type-safe development
-- **Tailwind CSS**: Utility-first styling
-- **shadcn/ui**: High-quality components
-
-### Backend Integration
-- **Firebase**: Real-time database and authentication
-- **NextAuth.js**: Secure session management
-- **Mapbox**: Interactive maps and geocoding
-
-### Performance
-- **Code Splitting**: Lazy loading for optimal performance
-- **Image Optimization**: Next.js image optimization
-- **Caching**: Smart caching strategies
-- **Bundle Analysis**: Optimized bundle sizes
-
 ## 🎨 Design System
 
 - **Color Palette**: Green (growth/sustainability) + Blue (trust/reliability)
@@ -192,6 +163,9 @@ MIT License - Feel free to use and modify for social good!
 
 ---
 
-**Built with ❤️ for the Bolt Hackathon**
+**⚡ Built with Bolt for the Hackathon 2025**
 
 *Making food distribution smarter, faster, and more equitable through technology.*
+
+### Bolt Badge
+This project proudly displays the "Made with Bolt" badge, showcasing the power of AI-assisted development in creating impactful solutions quickly and efficiently.

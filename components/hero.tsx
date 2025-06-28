@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Heart, Utensils, Building } from 'lucide-react';
+import { ArrowRight, Heart, Utensils, Building, Zap } from 'lucide-react';
 import { motion, useInView, useSpring, Variants, useTransform } from 'framer-motion';
 import { useRef, FC } from 'react';
 import { LucideProps } from 'lucide-react';
@@ -62,7 +62,7 @@ export default function Hero() {
     // Simulating a fetch for stats to make it feel more real
     const timer = setTimeout(() => {
       // In a real scenario, you would call getAnalyticsData()
-      // For now, we&#39;ll just use slightly higher numbers to show change
+      // For now, we'll just use slightly higher numbers to show change
       setStats({
         donations: 1573,
         mealsServed: 452108,
@@ -125,6 +125,18 @@ export default function Hero() {
       >
         <div className="grid md:grid-cols-2 gap-12 items-center">
           <div className="space-y-6">
+            <motion.div 
+              className="flex items-center space-x-2 mb-4"
+              variants={itemVariants}
+            >
+              <div className="flex items-center space-x-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-3 py-1 rounded-full text-sm font-semibold">
+                <Zap className="h-3 w-3 fill-current" />
+                <span>Built with Bolt</span>
+              </div>
+              <div className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-semibold">
+                Hackathon 2025
+              </div>
+            </motion.div>
             <motion.h1 
               className="text-4xl md:text-6xl font-extrabold text-gray-900 leading-tight"
               variants={itemVariants}
@@ -145,7 +157,7 @@ export default function Hero() {
           </div>
           <motion.div className="hidden md:block" variants={rightVariants}>
             <Image 
-              src="/happy-photo.png" 
+              src="https://images.unsplash.com/photo-1593113598332-cd288d649433?w=600&h=400&fit=crop&crop=center"
               alt="Happy people sharing food" 
               className="rounded-lg shadow-2xl"
               width={600}

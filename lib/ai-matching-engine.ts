@@ -1,4 +1,7 @@
 import { FoodDonation, FoodRequirement } from './firebase-service';
+import { supabaseService } from './supabase-service';
+import { database } from './firebase';
+import { ref, set, push, get } from 'firebase/database';
 
 export interface MatchPrediction {
   donationId: string;
@@ -13,6 +16,7 @@ export interface MatchPrediction {
     donorHistory: number;
     receiverHistory: number;
   };
+  timestamp?: string;
 }
 
 export interface DonorProfile {
@@ -129,65 +133,176 @@ class AIMatchingEngine {
     return Math.abs(hash);
   }
 
-  // Main matching algorithm
+  // Main matching algorithm - uses hybrid storage
+  // Fetches structured data from Supabase, stores predictions in Firebase
   async predictMatches(
-    donations: FoodDonation[], 
-    requirements: FoodRequirement[]
+    donations?: FoodDonation[], 
+    requirements?: FoodRequirement[]
   ): Promise<MatchPrediction[]> {
     const predictions: MatchPrediction[] = [];
 
-    for (const donation of donations) {
-      if (donation.status !== 'pending') continue;
+    try {
+      // If not provided, fetch from Supabase
+      let foodItems = donations;
+      let requests = requirements;
 
-      for (const requirement of requirements) {
-        if (requirement.status !== 'active') continue;
+      if (!foodItems) {
+        const availableItems = await supabaseService.foodItem.getAvailable();
+        // Convert Supabase format to FoodDonation format
+        foodItems = availableItems.map(item => ({
+          id: item.id,
+          donorId: item.donor_id,
+          donorName: '', // Will be enriched if needed
+          foodType: item.food_type,
+          quantity: item.quantity.toString(),
+          unit: item.unit,
+          description: item.description,
+          location: {
+            address: item.pickup_address,
+            lat: item.pickup_latitude,
+            lng: item.pickup_longitude,
+          },
+          pickupTime: item.pickup_time,
+          expiryDate: item.expiry_date,
+          imageUrl: item.image_url || undefined,
+          status: 'pending',
+          createdAt: item.created_at,
+          updatedAt: item.updated_at,
+        }));
+      }
 
-        const factors = {
-          foodTypeMatch: this.calculateFoodTypeMatch(donation.foodType, requirement.foodType),
-          locationProximity: this.calculateLocationProximity(
-            donation.location.lat,
-            donation.location.lng,
-            requirement.location.lat,
-            requirement.location.lng
-          ),
-          quantityMatch: this.calculateQuantityMatch(
-            parseFloat(donation.quantity),
-            parseFloat(requirement.quantity)
-          ),
-          urgencyFactor: this.urgencyMultipliers[requirement.urgency] || 1.0,
-          donorHistory: this.calculateDonorHistory(donation.donorId),
-          receiverHistory: this.calculateReceiverHistory(requirement.receiverId)
-        };
+      if (!requests) {
+        const activeRequests = await supabaseService.request.getActive();
+        // Convert Supabase format to FoodRequirement format
+        requests = activeRequests.map(req => ({
+          id: req.id,
+          receiverId: req.ngo_id,
+          receiverName: '', // Will be enriched if needed
+          organizationName: '',
+          title: req.title,
+          foodType: req.food_type,
+          quantity: req.quantity.toString(),
+          unit: req.unit,
+          urgency: req.urgency as 'high' | 'medium' | 'low',
+          description: req.description,
+          location: {
+            address: req.delivery_address,
+            lat: req.delivery_latitude,
+            lng: req.delivery_longitude,
+          },
+          neededBy: req.needed_by,
+          servingSize: req.serving_size.toString(),
+          status: 'active',
+          createdAt: req.created_at,
+          updatedAt: req.updated_at,
+        }));
+      }
 
-        // Weighted score calculation
-        const matchScore = (
-          factors.foodTypeMatch * 0.25 +
-          factors.locationProximity * 0.30 +
-          factors.quantityMatch * 0.20 +
-          factors.donorHistory * 0.15 +
-          factors.receiverHistory * 0.10
-        ) * factors.urgencyFactor;
+      for (const donation of foodItems) {
+        // Skip non-available donations
+        const donationStatus = donation.status || 'pending';
+        if (donationStatus !== 'pending') continue;
 
-        // Confidence based on data quality and consistency
-        const confidence = Math.min(
-          (factors.foodTypeMatch + factors.locationProximity + factors.quantityMatch) / 3,
-          0.95
-        );
+        for (const requirement of requests) {
+          if (requirement.status !== 'active') continue;
 
-        if (matchScore > 0.4) { // Only include viable matches
-          predictions.push({
-            donationId: donation.id!,
-            requirementId: requirement.id!,
-            matchScore,
-            confidence,
-            factors
-          });
+          const factors = {
+            foodTypeMatch: this.calculateFoodTypeMatch(donation.foodType, requirement.foodType),
+            locationProximity: this.calculateLocationProximity(
+              donation.location.lat,
+              donation.location.lng,
+              requirement.location.lat,
+              requirement.location.lng
+            ),
+            quantityMatch: this.calculateQuantityMatch(
+              parseFloat(donation.quantity),
+              parseFloat(requirement.quantity)
+            ),
+            urgencyFactor: this.urgencyMultipliers[requirement.urgency] || 1.0,
+            donorHistory: this.calculateDonorHistory(donation.donorId),
+            receiverHistory: this.calculateReceiverHistory(requirement.receiverId)
+          };
+
+          // Weighted score calculation
+          const matchScore = (
+            factors.foodTypeMatch * 0.25 +
+            factors.locationProximity * 0.30 +
+            factors.quantityMatch * 0.20 +
+            factors.donorHistory * 0.15 +
+            factors.receiverHistory * 0.10
+          ) * factors.urgencyFactor;
+
+          // Confidence based on data quality and consistency
+          const confidence = Math.min(
+            (factors.foodTypeMatch + factors.locationProximity + factors.quantityMatch) / 3,
+            0.95
+          );
+
+          if (matchScore > 0.4) { // Only include viable matches
+            const prediction: MatchPrediction = {
+              donationId: donation.id!,
+              requirementId: requirement.id!,
+              matchScore,
+              confidence,
+              factors,
+              timestamp: new Date().toISOString(),
+            };
+            predictions.push(prediction);
+          }
         }
       }
-    }
 
-    // Sort by match score descending
-    return predictions.sort((a, b) => b.matchScore - a.matchScore);
+      // Sort by match score descending
+      const sortedPredictions = predictions.sort((a, b) => b.matchScore - a.matchScore);
+
+      // Store predictions in Firebase for real-time access
+      await this.storePredictionsInFirebase(sortedPredictions);
+
+      return sortedPredictions;
+    } catch (error) {
+      console.error('Error in predictMatches:', error);
+      // Fallback to empty predictions
+      return [];
+    }
+  }
+
+  // Store AI predictions in Firebase (NoSQL) for real-time access
+  private async storePredictionsInFirebase(predictions: MatchPrediction[]): Promise<void> {
+    try {
+      const predictionsRef = ref(database, 'ai_predictions');
+      const timestamp = new Date().toISOString();
+      
+      // Store the latest prediction batch
+      await set(predictionsRef, {
+        predictions: predictions.slice(0, 50), // Store top 50 matches
+        generatedAt: timestamp,
+        count: predictions.length,
+      });
+
+      console.log(`✅ Stored ${predictions.length} AI predictions in Firebase`);
+    } catch (error) {
+      console.error('Error storing predictions in Firebase:', error);
+    }
+  }
+
+  // Retrieve predictions from Firebase
+  async getPredictionsFromFirebase(): Promise<{
+    predictions: MatchPrediction[];
+    generatedAt: string;
+    count: number;
+  } | null> {
+    try {
+      const predictionsRef = ref(database, 'ai_predictions');
+      const snapshot = await get(predictionsRef);
+      
+      if (snapshot.exists()) {
+        return snapshot.val();
+      }
+      return null;
+    } catch (error) {
+      console.error('Error retrieving predictions from Firebase:', error);
+      return null;
+    }
   }
 
   // Image recognition simulation

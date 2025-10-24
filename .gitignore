@@ -5,6 +5,7 @@
 /.pnp
 .pnp.js
 node_modules/
+
 # testing
 /coverage
 
@@ -16,6 +17,7 @@ node_modules/
 /build
 .bolt
 .next
+
 # misc
 .DS_Store
 *.pem
@@ -24,10 +26,16 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 
 # local env files
 .env
 .env*.local
+.env.local.backup
+.env.local.bak
+.env.development.local
+.env.test.local
+.env.production.local
 
 # vercel
 .vercel
@@ -37,27 +45,18 @@ yarn-error.log*
 next-env.d.ts
 
 # Build output
-.next/
 out/
 dist/
-
-# Logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
 
 # OS files
 .DS_Store
 Thumbs.db
+*.mov
+*.mp4
 
-# Env files
-.env*
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+# Env and Config files
 firebase-config.json
+client_secret*.json
 
 # Editor directories and files
 .vscode/
@@ -67,10 +66,7 @@ firebase-config.json
 
 # Misc
 *.log
-*.tsbuildinfo
-
-# Next.js
-.next/
+components.json
 
 # Coverage
 coverage/

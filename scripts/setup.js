@@ -39,8 +39,10 @@ NEXTAUTH_URL=http://localhost:3000
 # NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your-sender-id
 # NEXT_PUBLIC_FIREBASE_APP_ID=your-app-id
 
-# Mapbox API Key - Optional (for maps functionality)
-# NEXT_PUBLIC_MAPBOX_API_KEY=your-mapbox-api-key
+# Google Maps API Key - Required for maps and location autocomplete
+# Get your API key from: https://console.cloud.google.com/google/maps-apis
+# Enable: Maps JavaScript API & Places API
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=YOUR_GOOGLE_MAPS_API_KEY
 `;
 
 fs.writeFileSync(envPath, envTemplate);

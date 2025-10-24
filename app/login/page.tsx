@@ -75,12 +75,25 @@ export default function Login() {
 
       if (result?.error) {
         console.error('❌ Login error:', result.error);
-        setError(result.error);
+        // Show a friendly message for common auth errors
+        if (
+          result.error.includes('user-not-found') ||
+          result.error.toLowerCase().includes('incorrect password') ||
+          result.error.toLowerCase().includes('invalid')
+        ) {
+          setError('Invalid email or password. Please try again.');
+        } else {
+          setError(result.error);
+        }
         setLoading(false);
       } else if (result?.ok) {
         console.log('✅ Login successful, updating session');
         // Force session update and let useEffect handle redirect
         await update();
+        // Fallback: force redirect after 2 seconds if session is slow
+        setTimeout(() => {
+          window.location.href = '/donor';
+        }, 2000);
         // Keep loading true until redirect happens
       }
     } catch (error) {
@@ -92,7 +105,7 @@ export default function Login() {
   };
 
   const handleGoogleSignIn = () => {
-    signIn('google', { callbackUrl: '/' });
+    signIn('google', { callbackUrl: 'https://food-bridge-ai.vercel.app/' });
   };
 
   // Show loading if checking session or during login

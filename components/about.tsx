@@ -42,7 +42,7 @@ export default function About() {
     if (status === 'authenticated' && session?.user) {
       router.push('/donor');
     } else {
-      router.push('/login?callbackUrl=%2Fdonor');
+      router.push('/login?callbackUrl=https%3A%2F%2Ffood-bridge-ai.vercel.app%2Fdonor');
     }
   };
 
@@ -50,7 +50,7 @@ export default function About() {
     if (status === 'authenticated' && session?.user) {
       router.push('/receiver');
     } else {
-      router.push('/login?callbackUrl=%2Freceiver');
+      router.push('/login?callbackUrl=https%3A%2F%2Ffood-bridge-ai.vercel.app%2Freceiver');
     }
   };
 
@@ -98,18 +98,18 @@ export default function About() {
           >
             {features.map((feature) => (
               <motion.div key={feature.name} variants={fadeIn}>
-                <Card className="hover:shadow-lg transition-shadow duration-300 h-full">
+                <Card className="hover:shadow-xl hover:-translate-y-1 transition-all duration-300 h-full border-gray-200/60">
                   <CardContent className="p-6">
                     <div className="flex">
                       <div className="flex-shrink-0">
-                        <div className="flex items-center justify-center h-12 w-12 rounded-md bg-green-500 text-white">
+                        <div className="flex items-center justify-center h-12 w-12 rounded-md bg-gradient-to-br from-green-500 to-emerald-600 text-white shadow-md">
                           <feature.icon className="h-6 w-6" aria-hidden="true" />
                         </div>
                       </div>
                       <div className="ml-4">
-                        <h3 className="text-lg leading-6 font-medium text-gray-900">{feature.name}</h3>
-                        <p className="mt-2 text-base text-gray-500">{feature.description}</p>
-                        <p className="mt-2 text-sm text-gray-500">{feature.stat}</p>
+                        <h3 className="text-lg leading-6 font-semibold text-gray-900 mb-2">{feature.name}</h3>
+                        <p className="text-base text-gray-600 leading-relaxed">{feature.description}</p>
+                        <p className="mt-3 text-sm font-medium text-green-600">{feature.stat}</p>
                       </div>
                     </div>
                   </CardContent>

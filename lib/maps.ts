@@ -1,15 +1,5 @@
-import mapboxgl from 'mapbox-gl';
-
-// Set Mapbox access token with fallback
-const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_API_KEY || 'pk.eyJ1IjoiYmFubmVyeiIsImEiOiJjbHd6aHo4MHkwN2U2MmpxcGQ3M2w5eWd5In0.iSjrMliSYCJbQZl_dsyERQ';
-mapboxgl.accessToken = mapboxToken;
-
-// Check if we have a valid Mapbox token
-const hasValidMapboxToken = mapboxToken !== 'pk.eyJ1IjoiYmFubmVyeiIsImEiOiJjbHd6aHo4MHkwN2U2MmpxcGQ3M2w5eWd5In0.iSjrMliSYCJbQZl_dsyERQ';
-
-if (!hasValidMapboxToken) {
-  console.warn('⚠️ Mapbox API key not found. Using demo token.');
-}
+// Google Maps utility functions for FoodBridge AI
+// This file provides location services using Google Maps Platform APIs
 
 export interface Location {
   address: string;
@@ -29,60 +19,6 @@ export interface MapMarker {
   };
 }
 
-export const initializeMap = async (
-  mapElement: HTMLElement,
-  center: { lat: number; lng: number } = { lat: 40.7128, lng: -74.0060 }
-): Promise<mapboxgl.Map> => {
-  const map = new mapboxgl.Map({
-    container: mapElement,
-    style: 'mapbox://styles/mapbox/streets-v11',
-    center: [center.lng, center.lat],
-    zoom: 12
-  });
-
-  // Add navigation controls
-  map.addControl(new mapboxgl.NavigationControl());
-  
-  return map;
-};
-
-export const addMarkersToMap = (
-  map: mapboxgl.Map,
-  markers: MapMarker[]
-): mapboxgl.Marker[] => {
-  return markers.map(marker => {
-    // Create a custom marker element
-    const el = document.createElement('div');
-    el.className = 'marker';
-    el.style.width = '30px';
-    el.style.height = '30px';
-    el.style.borderRadius = '50%';
-    el.style.backgroundColor = marker.type === 'donor' ? '#10b981' : '#3b82f6';
-    el.style.border = '3px solid white';
-    el.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
-    el.style.cursor = 'pointer';
-
-    // Create popup content
-    const popupContent = `
-      <div class="p-3 max-w-xs">
-        <h3 class="font-semibold text-lg">${marker.info.name}</h3>
-        <p class="text-sm text-gray-600 mt-1">${marker.info.description}</p>
-        ${marker.info.contact ? `<p class="text-sm text-blue-600 mt-2">${marker.info.contact}</p>` : ''}
-      </div>
-    `;
-
-    const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(popupContent);
-
-    // Create and add marker
-    const mapMarker = new mapboxgl.Marker(el)
-      .setLngLat([marker.position.lng, marker.position.lat])
-      .setPopup(popup)
-      .addTo(map);
-
-    return mapMarker;
-  });
-};
-
 export const calculateDistance = (
   point1: { lat: number; lng: number },
   point2: { lat: number; lng: number }
@@ -99,27 +35,32 @@ export const calculateDistance = (
 };
 
 export const geocodeAddress = async (address: string): Promise<Location | null> => {
-  try {
-    const response = await fetch(
-      `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(address)}.json?access_token=${mapboxgl.accessToken}&limit=1`
-    );
-    
-    if (!response.ok) {
-      throw new Error('Geocoding request failed');
-    }
-
-    const data = await response.json();
-    
-    if (data.features && data.features.length > 0) {
-      const feature = data.features[0];
-      return {
-        address: feature.place_name,
-        lat: feature.center[1],
-        lng: feature.center[0]
-      };
-    }
-    
+  // Check if running in browser with Google Maps loaded
+  if (typeof window === 'undefined' || !(window as any).google?.maps) {
+    console.error('Google Maps API not loaded');
     return null;
+  }
+
+  try {
+    const google = (window as any).google;
+    const geocoder = new google.maps.Geocoder();
+    
+    return new Promise((resolve) => {
+      geocoder.geocode({ address }, (results: any[], status: string) => {
+        if (status === 'OK' && results && results.length > 0) {
+          const result = results[0];
+          const location: Location = {
+            address: result.formatted_address,
+            lat: result.geometry.location.lat(),
+            lng: result.geometry.location.lng()
+          };
+          resolve(location);
+        } else {
+          console.error('Geocoding failed:', status);
+          resolve(null);
+        }
+      });
+    });
   } catch (error) {
     console.error('Geocoding error:', error);
     return null;
@@ -130,108 +71,68 @@ export const initializeAutocomplete = async (
   inputElement: HTMLInputElement,
   onPlaceSelected: (location: Location) => void
 ): Promise<any> => {
-  // Create a simple autocomplete using Mapbox Geocoding API
-  let timeoutId: NodeJS.Timeout;
-  
-  const handleInput = async (event: Event) => {
-    const target = event.target as HTMLInputElement;
-    const query = target.value.trim();
+  // Wait for Google Maps to be loaded
+  if (typeof window === 'undefined' || !(window as any).google?.maps?.places) {
+    console.warn('Google Maps Places API not loaded yet. Waiting...');
     
-    if (query.length < 3) return;
-    
-    clearTimeout(timeoutId);
-    
-    timeoutId = setTimeout(async () => {
-      try {
-        const response = await fetch(
-          `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${mapboxgl.accessToken}&limit=5&types=address`
-        );
-        
-        if (!response.ok) return;
-        
-        const data = await response.json();
-        
-        // Clear existing suggestions
-        const existingList = document.getElementById('autocomplete-suggestions');
-        if (existingList) {
-          existingList.remove();
+    // Poll for Google Maps availability
+    return new Promise((resolve) => {
+      const checkInterval = setInterval(() => {
+        if ((window as any).google?.maps?.places) {
+          clearInterval(checkInterval);
+          resolve(initializeGoogleAutocomplete(inputElement, onPlaceSelected));
         }
-        
-        if (data.features && data.features.length > 0) {
-          // Create suggestions dropdown
-          const suggestionsList = document.createElement('ul');
-          suggestionsList.id = 'autocomplete-suggestions';
-          suggestionsList.style.cssText = `
-            position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
-            background: white;
-            border: 1px solid #ddd;
-            border-top: none;
-            border-radius: 0 0 4px 4px;
-            max-height: 200px;
-            overflow-y: auto;
-            z-index: 1000;
-            list-style: none;
-            margin: 0;
-            padding: 0;
-          `;
-          
-          data.features.forEach((feature: any) => {
-            const li = document.createElement('li');
-            li.textContent = feature.place_name;
-            li.style.cssText = `
-              padding: 8px 12px;
-              cursor: pointer;
-              border-bottom: 1px solid #eee;
-            `;
-            
-            li.addEventListener('click', () => {
-              const location: Location = {
-                address: feature.place_name,
-                lat: feature.center[1],
-                lng: feature.center[0]
-              };
-              
-              inputElement.value = feature.place_name;
-              suggestionsList.remove();
-              onPlaceSelected(location);
-            });
-            
-            li.addEventListener('mouseenter', () => {
-              li.style.backgroundColor = '#f5f5f5';
-            });
-            
-            li.addEventListener('mouseleave', () => {
-              li.style.backgroundColor = 'white';
-            });
-            
-            suggestionsList.appendChild(li);
-          });
-          
-          inputElement.parentElement?.appendChild(suggestionsList);
-        }
-      } catch (error) {
-        console.error('Autocomplete error:', error);
-      }
-    }, 300);
-  };
+      }, 100);
+      
+      // Timeout after 10 seconds
+      setTimeout(() => {
+        clearInterval(checkInterval);
+        console.error('Google Maps Places API failed to load');
+        resolve({ destroy: () => {} });
+      }, 10000);
+    });
+  }
   
-  inputElement.addEventListener('input', handleInput);
+  return initializeGoogleAutocomplete(inputElement, onPlaceSelected);
+};
+
+const initializeGoogleAutocomplete = (
+  inputElement: HTMLInputElement,
+  onPlaceSelected: (location: Location) => void
+): any => {
+  const google = (window as any).google;
   
-  // Remove suggestions when clicking outside
-  document.addEventListener('click', (event) => {
-    const suggestionsList = document.getElementById('autocomplete-suggestions');
-    if (suggestionsList && !inputElement.contains(event.target as Node)) {
-      suggestionsList.remove();
-    }
+  // Create autocomplete instance
+  const autocomplete = new google.maps.places.Autocomplete(inputElement, {
+    types: ['geocode', 'establishment'],
+    fields: ['formatted_address', 'geometry', 'name', 'place_id']
   });
   
-  return { destroy: () => {
-    inputElement.removeEventListener('input', handleInput);
-    clearTimeout(timeoutId);
-  }};
+  // Listen for place selection
+  const placeChangedListener = autocomplete.addListener('place_changed', () => {
+    const place = autocomplete.getPlace();
+    
+    if (!place.geometry || !place.geometry.location) {
+      console.warn('No geometry found for selected place');
+      return;
+    }
+    
+    const location: Location = {
+      address: place.formatted_address || place.name || '',
+      lat: place.geometry.location.lat(),
+      lng: place.geometry.location.lng()
+    };
+    
+    console.log('Google Place selected:', location);
+    onPlaceSelected(location);
+  });
+  
+  return {
+    destroy: () => {
+      google.maps.event.removeListener(placeChangedListener);
+    },
+    autocomplete
+  };
 };
 
 export const findNearbyMatches = (

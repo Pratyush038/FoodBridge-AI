@@ -14,8 +14,10 @@ import { CalendarIcon, Heart, MapPin, Users, Clock, Loader2 } from 'lucide-react
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { createRequirement } from '@/lib/firebase-service';
+import { ensureUserInSupabase } from '@/lib/user-service';
 import { initializeAutocomplete, Location } from '@/lib/maps';
 import { toast } from 'sonner';
+import GoogleMapsLoader from '@/components/google-maps-loader';
 
 interface RequirementsFormProps {
   onSuccess?: () => void;
@@ -57,7 +59,7 @@ export default function RequirementsForm({ onSuccess }: RequirementsFormProps) {
     localStorage.setItem('requirementsFormData', JSON.stringify(formData));
   }, [formData]);
 
-  // Initialize Mapbox Geocoder
+  // Initialize Google Places Autocomplete
   useEffect(() => {
     if (addressInputRef.current && !autocomplete) {
       const newAutocomplete = initializeAutocomplete(addressInputRef.current, (location) => {
@@ -108,9 +110,26 @@ export default function RequirementsForm({ onSuccess }: RequirementsFormProps) {
         return;
       }
 
+      // Ensure user exists in Supabase and get the NGO ID
+      const user = session.user;
+      const userInfo = {
+        id: (user as any).id || user.email || 'temp-id',
+        email: user.email || '',
+        name: user.name || 'Anonymous Receiver',
+        role: 'receiver' as const,
+        organizationName: formData.organizationName,
+      };
+      
+      const { ngoId } = await ensureUserInSupabase(userInfo);
+      const finalNgoId = ngoId || userInfo.id;
+
+      // Ensure neededBy has a default timestamp if not specified
+      const neededByISO = formData.neededBy?.toISOString() || 
+                         new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
       // Create requirement object
       const requirement = {
-        receiverId: (session.user as any).id || session.user.email || 'current-user',
+        receiverId: finalNgoId,
         receiverName: session.user.name || 'Anonymous Receiver',
         organizationName: formData.organizationName,
         title: formData.title,
@@ -120,14 +139,14 @@ export default function RequirementsForm({ onSuccess }: RequirementsFormProps) {
         urgency: formData.urgency as 'high' | 'medium' | 'low',
         description: formData.description,
         location: formData.location!, // We've already validated this is not null
-        neededBy: formData.neededBy?.toISOString() || '',
+        neededBy: neededByISO,
         servingSize: formData.servingSize,
         status: 'active' as const
       };
 
       console.log('📋 Submitting requirement:', requirement);
 
-      // Save to Firebase
+      // Save to database (Supabase + Firebase)
       const requirementId = await createRequirement(requirement);
       
       console.log('✅ Requirement created with ID:', requirementId);
@@ -155,8 +174,8 @@ export default function RequirementsForm({ onSuccess }: RequirementsFormProps) {
       localStorage.removeItem('requirementsFormData');
 
       // Show success message with more details
-      toast.success(`🎯 Requirement Posted Successfully!`, {
-        description: `${formData.quantity} ${formData.unit} of ${formData.foodType} needed by ${formData.organizationName} is now visible to donors.`,
+      toast.success(`Requirement Posted Successfully!`, {
+        description: `${formData.quantity} ${formData.unit} of ${formData.foodType} needed by ${formData.organizationName} is now visible to donors in Supabase.`,
         duration: 5000,
       });
       
@@ -172,26 +191,31 @@ export default function RequirementsForm({ onSuccess }: RequirementsFormProps) {
         }
       }, 1000);
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating requirement:', error);
-      toast.error('Failed to post requirement. Please try again.');
+      const errorMessage = error?.message || 'Unknown error occurred';
+      toast.error(`Failed to post requirement: ${errorMessage}`, {
+        description: 'Please check your network connection and try again. If the problem persists, check the browser console for details.',
+        duration: 6000,
+      });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center space-x-2">
-          <Heart className="h-5 w-5" />
-          <span>Post Food Requirements</span>
-        </CardTitle>
-        <CardDescription>
-          Let donors know what food your organization needs
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
+    <GoogleMapsLoader>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Heart className="h-5 w-5" />
+            <span>Post Food Requirements</span>
+          </CardTitle>
+          <CardDescription>
+            Let donors know what food your organization needs
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-2">
             <Label htmlFor="title">Requirement Title *</Label>
@@ -371,5 +395,6 @@ export default function RequirementsForm({ onSuccess }: RequirementsFormProps) {
         </form>
       </CardContent>
     </Card>
+    </GoogleMapsLoader>
   );
 }

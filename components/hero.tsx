@@ -126,31 +126,33 @@ export default function Hero() {
         <div className="grid md:grid-cols-2 gap-12 items-center">
           <div className="space-y-6">
             <motion.h1 
-              className="text-4xl md:text-6xl font-extrabold text-gray-900 leading-tight"
+              className="text-4xl md:text-6xl font-bold text-gray-900 leading-tight tracking-tight"
               variants={itemVariants}
             >
-              Bridge the Gap Between <span className="text-green-600">Surplus Food</span> and Those in Need.
+              Bridge the Gap Between <span className="text-green-600 bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">Surplus Food</span> and Those in Need.
             </motion.h1>
             <motion.p 
-              className="text-lg md:text-xl text-gray-600"
+              className="text-lg md:text-xl text-gray-600 leading-relaxed"
               variants={itemVariants}
             >
               FoodBridge AI uses intelligent matching to connect food donors with NGOs and shelters, ensuring that excess food reaches the plates of the hungry, not landfills.
             </motion.p>
             <motion.div className="flex space-x-4" variants={itemVariants}>
-              <Button size="lg" onClick={handleGetStarted}>
+              <Button size="lg" onClick={handleGetStarted} className="shadow-lg hover:shadow-xl transition-shadow duration-300">
                 Get Started <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </motion.div>
           </div>
-          <motion.div className="hidden md:block" variants={rightVariants}>
-            <Image 
-              src="/happy-photo.png" 
-              alt="Happy people sharing food" 
-              className="rounded-lg shadow-2xl"
-              width={600}
-              height={400}
-            />
+          <motion.div className="hidden md:block relative h-[500px]" variants={rightVariants}>
+            <div className="relative w-full h-full rounded-2xl overflow-hidden shadow-2xl">
+              <Image
+                src="/happy-photo.png"
+                alt="Food donation connecting communities"
+                fill
+                className="object-cover"
+                priority
+              />
+            </div>
           </motion.div>
         </div>
 
@@ -165,7 +167,7 @@ export default function Hero() {
             <div className="absolute inset-0 h-1/2 bg-white/30 backdrop blur-md rounder-xl border border-white/10" />
             <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="max-w-4xl mx-auto">
-                <dl className="rounded-lg bg-white shadow-lg sm:grid sm:grid-cols-3">
+                <dl className="rounded-lg bg-white shadow-lg hover:shadow-xl transition-shadow duration-300 sm:grid sm:grid-cols-3">
                   <AnimatedNumber value={stats.donations} label="Donations" icon={Heart} />
                   <AnimatedNumber value={stats.mealsServed} label="Meals Served" icon={Utensils} />
                   <AnimatedNumber value={stats.cities} label="Cities Covered" icon={Building} />

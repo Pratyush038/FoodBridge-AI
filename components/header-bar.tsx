@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Heart, User, LogOut, Loader2, UserCheck, Settings } from 'lucide-react';
+import { Heart, User, LogOut, Loader2, UserCheck, Settings, Bot } from 'lucide-react';
 import { useState } from 'react';
 import {
   DropdownMenu,
@@ -75,11 +75,17 @@ export default function HeaderBar() {
     >
       {/* Logo and About Us */}
       <div className="flex items-center space-x-6">
-        <Link href="/" className="flex items-center space-x-2">
-          <Heart className={`h-7 w-7 ${isLanding ? 'text-green-500' : 'text-green-600'}`} />
-          <span className={`text-2xl font-extrabold ${isLanding ? 'text-white' : 'text-gray-900'} tracking-tight`}>FoodBridge AI</span>
+        <Link href="/" className="flex items-center space-x-2 group">
+          <Heart className={`h-7 w-7 ${isLanding ? 'text-green-500' : 'text-green-600'} transition-transform duration-300 group-hover:scale-110`} />
+          <span className={`text-2xl font-bold ${isLanding ? 'text-white' : 'text-gray-900'} tracking-tight`}>FoodBridge AI</span>
         </Link>
-        <Link href="/about" className={`text-lg font-semibold ${isLanding ? 'text-gray-200' : 'text-gray-700'} hover:text-green-500 transition-colors px-3 py-1 rounded-md focus:outline-none focus:ring-2 focus:ring-green-400/50`}>About Us</Link>
+        <Link href="/about" className={`text-base font-semibold ${isLanding ? 'text-gray-200 hover:text-white' : 'text-gray-700 hover:text-green-600'} transition-all duration-200 px-3 py-1 rounded-md focus:outline-none focus:ring-2 focus:ring-green-400/50`}>About Us</Link>
+        {session?.user && (
+          <Link href="/chat" className={`text-base font-semibold ${isLanding ? 'text-gray-200 hover:text-white' : 'text-gray-700 hover:text-green-600'} transition-all duration-200 px-3 py-1 rounded-md focus:outline-none focus:ring-2 focus:ring-green-400/50 flex items-center gap-2`}>
+            <Bot className="h-5 w-5" />
+            AI Chat
+          </Link>
+        )}
       </div>
 
       {/* User Profile & Role Switcher */}

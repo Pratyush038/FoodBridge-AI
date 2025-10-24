@@ -15,8 +15,10 @@ import { CalendarIcon, Upload, MapPin, Clock, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { createDonation, getDonationsByDonor } from '@/lib/firebase-service';
+import { ensureUserInSupabase } from '@/lib/user-service';
 import { geocodeAddress, initializeAutocomplete, Location } from '@/lib/maps';
 import { toast } from 'sonner';
+import GoogleMapsLoader from '@/components/google-maps-loader';
 
 interface FoodUploadFormProps {
   onSuccess?: () => void;
@@ -59,7 +61,7 @@ export default function FoodUploadForm({ onSuccess }: FoodUploadFormProps) {
     localStorage.setItem('foodDonationFormData', JSON.stringify(dataToSave));
   }, [formData]);
 
-  // Initialize Mapbox Geocoder
+  // Initialize Google Places Autocomplete
   useEffect(() => {
     if (addressInputRef.current && !autocomplete) {
       const newAutocomplete = initializeAutocomplete(addressInputRef.current, (location) => {
@@ -116,24 +118,48 @@ export default function FoodUploadForm({ onSuccess }: FoodUploadFormProps) {
         return;
       }
 
+      // Ensure user exists in Supabase and get the donor ID
+      const user = session.user;
+      const userInfo = {
+        id: (user as any).id || user.email || 'temp-id',
+        email: user.email || '',
+        name: user.name || 'Anonymous Donor',
+        role: 'donor' as const,
+      };
+      
+      const { donorId } = await ensureUserInSupabase(userInfo);
+      const finalDonorId = donorId || userInfo.id;
+
+      // Convert pickupTime (HH:mm) to ISO timestamp
+      let pickupTimeISO = '';
+      if (formData.pickupTime) {
+        const today = new Date();
+        const [hours, minutes] = formData.pickupTime.split(':');
+        today.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+        pickupTimeISO = today.toISOString();
+      } else {
+        // Default to current time if not specified
+        pickupTimeISO = new Date().toISOString();
+      }
+
       // Create donation object
       const donation = {
-        donorId: (session.user as any).id || session.user.email || 'current-user',
+        donorId: finalDonorId,
         donorName: session.user.name || 'Anonymous Donor',
         foodType: formData.foodType,
         quantity: formData.quantity,
         unit: formData.unit,
         description: formData.description,
         location: formData.location!, // We've already validated this is not null
-        pickupTime: formData.pickupTime,
-        expiryDate: formData.expiryDate?.toISOString() || '',
+        pickupTime: pickupTimeISO,
+        expiryDate: formData.expiryDate?.toISOString() || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
         imageUrl: imagePreview || undefined,
         status: 'pending' as const
       };
 
       console.log('📝 Submitting donation:', donation);
 
-      // Save to Firebase
+      // Save to database (Supabase + Firebase)
       const donationId = await createDonation(donation);
       
       console.log('✅ Donation created with ID:', donationId);
@@ -161,7 +187,7 @@ export default function FoodUploadForm({ onSuccess }: FoodUploadFormProps) {
 
       // Show success message with more details
       toast.success(`🎉 Donation Posted Successfully!`, {
-        description: `${formData.quantity} ${formData.unit} of ${formData.foodType} has been posted and is now visible to organizations in need.`,
+        description: `${formData.quantity} ${formData.unit} of ${formData.foodType} has been posted to Supabase and is now visible to organizations in need.`,
         duration: 5000,
       });
       
@@ -177,26 +203,31 @@ export default function FoodUploadForm({ onSuccess }: FoodUploadFormProps) {
         }
       }, 1000);
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating donation:', error);
-      toast.error('Failed to post donation. Please try again.');
+      const errorMessage = error?.message || 'Unknown error occurred';
+      toast.error(`Failed to post donation: ${errorMessage}`, {
+        description: 'Please check your network connection and try again. If the problem persists, check the browser console for details.',
+        duration: 6000,
+      });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center space-x-2">
-          <Upload className="h-5 w-5" />
-          <span>Upload Food Donation</span>
-        </CardTitle>
-        <CardDescription>
-          Share details about your food surplus to connect with organizations in need
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
+    <GoogleMapsLoader>
+      <Card className="hover:shadow-lg transition-all duration-300">
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2 text-2xl">
+            <Upload className="h-6 w-6" />
+            <span>Upload Food Donation</span>
+          </CardTitle>
+          <CardDescription className="text-base">
+            Share details about your food surplus to connect with organizations in need
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
@@ -364,5 +395,6 @@ export default function FoodUploadForm({ onSuccess }: FoodUploadFormProps) {
         </form>
       </CardContent>
     </Card>
+    </GoogleMapsLoader>
   );
 }

@@ -238,3 +238,6 @@ export const authOptions: NextAuthOptions = {
   },
   debug: process.env.NODE_ENV === 'development'
 };
+
+// IMPORTANT: In Google Cloud Console, set the OAuth redirect URI to:
+// https://food-bridge-ai.vercel.app/api/auth/callback/google

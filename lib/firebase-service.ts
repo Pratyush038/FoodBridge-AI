@@ -12,6 +12,8 @@ import {
   limitToLast
 } from 'firebase/database';
 import { database } from './firebase';
+import { foodItemService, requestService, transactionService } from './supabase-service';
+import { supabase } from './supabase';
 
 export interface FoodDonation {
   id?: string;
@@ -256,253 +258,358 @@ const getDatabaseAvailabilitySync = () => {
 
 // Donation functions
 export const createDonation = async (donation: Omit<FoodDonation, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
-  console.log('📝 Creating donation:', donation);
+  console.log('📝 Creating donation - NO FALLBACK TO MOCK DATA:', donation);
   
   try {
-    const isAvailable = await getDatabaseAvailability();
+    // First, save to Supabase (primary database)
+    console.log('💾 Saving to Supabase...');
     
-    if (!isAvailable) {
-      console.log('📦 Using mock data for donation creation');
-      const newDonation: FoodDonation = {
-        ...donation,
-        id: `mock-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-      
-      // Add to beginning of array to show newest first
-      mockDonations.unshift(newDonation);
-      console.log('📦 Added donation to mock data:', newDonation.id);
-      console.log('📦 Total mock donations:', mockDonations.length);
-      
-      // Notify all listeners immediately with the updated data
-      notify(donationsListeners, [...mockDonations]);
-      
-      return Promise.resolve(newDonation.id!);
-    }
-
-    console.log('🔥 Using real Firebase database for donation creation');
-    const donationsRef = ref(database, 'donations');
-    const newDonationRef = push(donationsRef);
+    // Ensure timestamps are in ISO format
+    const pickupTime = donation.pickupTime || new Date().toISOString();
+    const expiryDate = donation.expiryDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
     
-    const key = newDonationRef.key;
-    if (!key) {
-      throw new Error('Failed to generate donation ID');
-    }
+    console.log('⏰ Timestamps:', { pickupTime, expiryDate });
     
-    const donationWithId: FoodDonation = {
-      ...donation,
-      id: key!,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+    const supabaseData = {
+      donor_id: donation.donorId,
+      food_type: donation.foodType,
+      quantity: parseFloat(donation.quantity),
+      unit: donation.unit,
+      description: donation.description,
+      pickup_address: donation.location.address,
+      pickup_latitude: donation.location.lat,
+      pickup_longitude: donation.location.lng,
+      pickup_time: pickupTime,
+      expiry_date: expiryDate,
+      image_url: donation.imageUrl || '',
+      status: 'available' as const,
     };
     
-    await set(newDonationRef, donationWithId);
-    console.log('✅ Donation saved to Firebase with ID:', key);
-    return key;
+    const supabaseResult = await foodItemService.create(supabaseData);
+    
+    if (!supabaseResult) {
+      console.error('❌ Supabase returned null - donation not saved!');
+      throw new Error('Failed to save donation to Supabase - received null response');
+    }
+    
+    console.log('✅ Saved to Supabase with ID:', supabaseResult.id);
+    
+    // Also save to Firebase for real-time updates (optional)
+    const firebaseData: FoodDonation = {
+      ...donation,
+      id: supabaseResult.id,
+      createdAt: supabaseResult.created_at,
+      updatedAt: supabaseResult.created_at
+    };
+    
+    try {
+      const donationsRef = ref(database, `donations/${supabaseResult.id}`);
+      await set(donationsRef, firebaseData);
+      console.log('✅ Synced to Firebase for real-time updates');
+    } catch (firebaseError) {
+      console.warn('⚠️ Firebase sync failed (non-critical):', firebaseError);
+    }
+    
+    return supabaseResult.id;
   } catch (error) {
-    console.error('❌ Error creating donation:', error);
-    // Fallback to mock data if Firebase fails
-    console.log('📦 Falling back to mock data due to Firebase error');
-    const newDonation: FoodDonation = {
-      ...donation,
-      id: `mock-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    
-    mockDonations.unshift(newDonation);
-    notify(donationsListeners, [...mockDonations]);
-    
-    return Promise.resolve(newDonation.id!);
+    console.error('❌ Error creating donation in Supabase:', error);
+    throw error;
   }
 };
 
 export const updateDonationStatus = async (donationId: string, status: FoodDonation['status'], matchedWith?: string): Promise<void> => {
-  if (!getDatabaseAvailabilitySync()) {
-    const donation = mockDonations.find(d => d.id === donationId);
-    if (donation) {
-      donation.status = status;
-      donation.updatedAt = new Date().toISOString();
+  console.log(`🔄 Updating donation status in Supabase: ${donationId} to ${status}`);
+  
+  try {
+    // Map status to Supabase food_items status
+    const supabaseStatus = 
+      status === 'pending' ? 'available' :
+      status === 'matched' ? 'reserved' :
+      status === 'completed' ? 'collected' :
+      'expired';
+    
+    // Update using the foodItemService - only update status
+    await foodItemService.updateStatus(donationId, supabaseStatus as any);
+    console.log('✅ Donation status updated in Supabase');
+    
+    // Also update in Firebase for real-time sync (optional) - includes matchedWith
+    try {
+      const donationRef = ref(database, `donations/${donationId}`);
+      const firebaseUpdates: Partial<FoodDonation> = {
+        status,
+        updatedAt: new Date().toISOString()
+      };
+      
       if (matchedWith) {
-        donation.matchedWith = matchedWith;
-        donation.matchedAt = new Date().toISOString();
+        firebaseUpdates.matchedWith = matchedWith;
+        firebaseUpdates.matchedAt = new Date().toISOString();
       }
-      console.log('Mock donation updated:', donation);
+      
+      await update(donationRef, firebaseUpdates);
+      console.log('✅ Donation status synced to Firebase');
+    } catch (firebaseError) {
+      console.warn('⚠️ Firebase sync failed (non-critical):', firebaseError);
     }
-    return;
+  } catch (error) {
+    console.error('❌ Error updating donation status:', error);
+    throw error;
   }
-
-  const donationRef = ref(database, `donations/${donationId}`);
-  const updates: Partial<FoodDonation> = {
-    status,
-    updatedAt: new Date().toISOString()
-  };
-  
-  if (matchedWith) {
-    updates.matchedWith = matchedWith;
-    updates.matchedAt = new Date().toISOString();
-  }
-  
-  await update(donationRef, updates);
 };
 
-export const getDonationsByDonor = (donorId: string, callback: (donations: FoodDonation[]) => void) => {
-  console.log(`👂 Setting up listener for donations by donor: ${donorId}`);
+export const updateRequirementStatus = async (requirementId: string, status: FoodRequirement['status'], matchedWith?: string): Promise<void> => {
+  console.log(`🔄 Updating requirement status in Supabase: ${requirementId} to ${status}`);
   
-  if (!getDatabaseAvailabilitySync()) {
-    const getMockDonations = () => {
-      console.log('📦 Getting mock donations for donor:', donorId);
-      const filteredDonations = mockDonations.filter(d => d.donorId === donorId || d.donorId === 'current-user');
-      console.log(`📦 Found ${filteredDonations.length} mock donations for this donor`);
-      // Return in reverse order to show newest first (since we're adding to beginning of array)
-      callback(filteredDonations);
-    };
-
-    getMockDonations();
-    const unsubscribe = subscribe(donationsListeners, getMockDonations);
-    return unsubscribe;
+  try {
+    // Map status to Supabase requests status
+    const supabaseStatus = 
+      status === 'active' ? 'active' :
+      status === 'matched' ? 'matched' :
+      'fulfilled';
+    
+    // Update using the requestService - only update status
+    await requestService.updateStatus(requirementId, supabaseStatus as any);
+    console.log('✅ Requirement status updated in Supabase');
+    
+    // Also update in Firebase for real-time sync (optional) - includes matchedWith
+    try {
+      const requirementRef = ref(database, `requirements/${requirementId}`);
+      const firebaseUpdates: Partial<FoodRequirement> = {
+        status,
+        updatedAt: new Date().toISOString()
+      };
+      
+      if (matchedWith) {
+        firebaseUpdates.matchedWith = matchedWith;
+        firebaseUpdates.matchedAt = new Date().toISOString();
+      }
+      
+      await update(requirementRef, firebaseUpdates);
+      console.log('✅ Requirement status synced to Firebase');
+    } catch (firebaseError) {
+      console.warn('⚠️ Firebase sync failed (non-critical):', firebaseError);
+    }
+  } catch (error) {
+    console.error('❌ Error updating requirement status:', error);
+    throw error;
   }
+};
 
-  console.log('🔥 Using real Firebase database for donations');
-  const donationsRef = query(ref(database, 'donations'), orderByChild('donorId'), equalTo(donorId));
+export const getDonationsByDonor = async (donorId: string, callback: (donations: FoodDonation[]) => void) => {
+  console.log(`👂 Setting up listener for donations by donor (Supabase ONLY): ${donorId}`);
   
-  return onValue(donationsRef, (snapshot) => {
-    const donations: FoodDonation[] = [];
-    snapshot.forEach((child) => {
-      donations.push(child.val());
+  try {
+    // Fetch from Supabase (primary database)
+    const supabaseDonations = await foodItemService.getByDonor(donorId);
+    console.log(`💾 Found ${supabaseDonations.length} donations from Supabase`);
+    
+    // Convert Supabase format to FoodDonation format
+    const convertSupabaseToFoodDonation = (item: any): FoodDonation => ({
+      id: item.id,
+      donorId: item.donor_id,
+      donorName: 'Donor',
+      foodType: item.food_type,
+      quantity: item.quantity.toString(),
+      unit: item.unit,
+      description: item.description,
+      location: {
+        address: item.pickup_address,
+        lat: item.pickup_latitude,
+        lng: item.pickup_longitude
+      },
+      pickupTime: item.pickup_time,
+      expiryDate: item.expiry_date,
+      imageUrl: item.image_url || undefined,
+      status: (item.status === 'available' ? 'pending' : 
+               item.status === 'reserved' ? 'matched' : 
+               item.status === 'collected' ? 'completed' : 'expired') as FoodDonation['status'],
+      createdAt: item.created_at,
+      updatedAt: item.updated_at
     });
-    console.log(`🔥 Found ${donations.length} donations from Firebase for donor: ${donorId}`);
-    // Return in reverse order to show newest first
-    callback(donations.reverse());
-  });
+    
+    const donations: FoodDonation[] = supabaseDonations.map(convertSupabaseToFoodDonation);
+    
+    callback(donations);
+    
+    // Set up real-time listener using Supabase subscriptions
+    const subscription = supabase
+      .channel(`donations-${donorId}`)
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'food_items', filter: `donor_id=eq.${donorId}` },
+        async (payload: any) => {
+          console.log('🔄 Supabase real-time update:', payload);
+          // Refetch all donations on any change
+          const updatedDonations = await foodItemService.getByDonor(donorId);
+          const converted = updatedDonations.map(convertSupabaseToFoodDonation);
+          callback(converted);
+        }
+      )
+      .subscribe();
+    
+    // Return unsubscribe function
+    return () => {
+      subscription.unsubscribe();
+    };
+  } catch (error) {
+    console.error('❌ Error setting up donations listener from Supabase:', error);
+    // Return a no-op unsubscribe function
+    return () => {};
+  }
 };
 
 // Requirement functions
 export const createRequirement = async (requirement: Omit<FoodRequirement, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
-  console.log('📋 Creating requirement:', requirement);
+  console.log('📋 Creating requirement - NO FALLBACK TO MOCK DATA:', requirement);
   
   try {
-    const isAvailable = await getDatabaseAvailability();
+    // First, save to Supabase (primary database)
+    console.log('💾 Saving requirement to Supabase...');
     
-    if (!isAvailable) {
-      console.log('📋 Using mock data for requirement creation');
-      const newRequirement: FoodRequirement = {
-        ...requirement,
-        id: `mock-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-      
-      // Add to beginning of array to show newest first
-      mockRequirements.unshift(newRequirement);
-      console.log('📋 Added requirement to mock data:', newRequirement.id);
-      console.log('📋 Total mock requirements:', mockRequirements.length);
-      
-      // Notify all listeners immediately with the updated data
-      notify(requirementsListeners, [...mockRequirements]);
-      
-      return Promise.resolve(newRequirement.id!);
-    }
-
-    console.log('🔥 Using real Firebase database for requirement creation');
-    const requirementsRef = ref(database, 'requirements');
-    const newRequirementRef = push(requirementsRef);
+    // Ensure timestamps are in ISO format
+    const neededBy = requirement.neededBy || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
     
-    const key = newRequirementRef.key;
-    if (!key) {
-      throw new Error('Failed to generate requirement ID');
-    }
-
-    const requirementWithId: FoodRequirement = {
-      ...requirement,
-      id: key!,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+    console.log('⏰ Timestamp:', { neededBy });
+    
+    const supabaseData = {
+      ngo_id: requirement.receiverId,
+      title: requirement.title,
+      food_type: requirement.foodType,
+      quantity: parseFloat(requirement.quantity),
+      unit: requirement.unit,
+      urgency: requirement.urgency,
+      description: requirement.description,
+      delivery_address: requirement.location.address,
+      delivery_latitude: requirement.location.lat,
+      delivery_longitude: requirement.location.lng,
+      needed_by: neededBy,
+      serving_size: parseInt(requirement.servingSize) || 0,
+      status: 'active' as const,
     };
     
-    await set(newRequirementRef, requirementWithId);
-    console.log('✅ Requirement saved to Firebase with ID:', key);
-    return key;
+    console.log('📤 Supabase data to insert:', supabaseData);
+    
+    const supabaseResult = await requestService.create(supabaseData);
+    
+    if (!supabaseResult) {
+      console.error('❌ Supabase returned null - requirement not saved!');
+      throw new Error('Failed to save requirement to Supabase - received null response');
+    }
+    
+    console.log('✅ Saved requirement to Supabase with ID:', supabaseResult.id);
+    
+    // Also save to Firebase for real-time updates (optional)
+    const firebaseData: FoodRequirement = {
+      ...requirement,
+      id: supabaseResult.id,
+      createdAt: supabaseResult.created_at,
+      updatedAt: supabaseResult.created_at
+    };
+    
+    try {
+      const requirementsRef = ref(database, `requirements/${supabaseResult.id}`);
+      await set(requirementsRef, firebaseData);
+      console.log('✅ Synced requirement to Firebase for real-time updates');
+    } catch (firebaseError) {
+      console.warn('⚠️ Firebase sync failed (non-critical):', firebaseError);
+    }
+    
+    return supabaseResult.id;
   } catch (error) {
-    console.error('❌ Error creating requirement:', error);
-    // Fallback to mock data if Firebase fails
-    console.log('📋 Falling back to mock data due to Firebase error');
-    const newRequirement: FoodRequirement = {
-      ...requirement,
-      id: `mock-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    
-    mockRequirements.unshift(newRequirement);
-    notify(requirementsListeners, [...mockRequirements]);
-    
-    return Promise.resolve(newRequirement.id!);
+    console.error('❌ Error creating requirement in Supabase:', error);
+    throw error;
   }
 };
 
-export const getRequirementsByReceiver = (receiverId: string, callback: (requirements: FoodRequirement[]) => void) => {
-  console.log(`👂 Setting up listener for requirements by receiver: ${receiverId}`);
+export const getRequirementsByReceiver = async (receiverId: string, callback: (requirements: FoodRequirement[]) => void) => {
+  console.log(`👂 Setting up listener for requirements by receiver (Supabase ONLY): ${receiverId}`);
 
-  if (!getDatabaseAvailabilitySync()) {
-    const getMockRequirements = () => {
-      console.log('📦 Getting mock requirements for receiver:', receiverId);
-      const filteredRequirements = mockRequirements.filter(r => r.receiverId === receiverId || r.receiverId === 'current-user');
-      console.log(`📦 Found ${filteredRequirements.length} mock requirements for this receiver`);
-      // Return in reverse order to show newest first (since we're adding to beginning of array)
-      callback(filteredRequirements);
-    };
-
-    getMockRequirements();
-    const unsubscribe = subscribe(requirementsListeners, getMockRequirements);
-    return unsubscribe;
-  }
-
-  console.log('🔥 Using real Firebase database for requirements');
-  const requirementsRef = query(ref(database, 'requirements'), orderByChild('receiverId'), equalTo(receiverId));
-  const listener = onValue(requirementsRef, (snapshot) => {
-    const requirements: FoodRequirement[] = [];
-    snapshot.forEach((child) => {
-      requirements.push(child.val());
+  try {
+    // Fetch from Supabase (primary database)
+    const supabaseRequirements = await requestService.getByNGO(receiverId);
+    console.log(`💾 Found ${supabaseRequirements.length} requirements from Supabase`);
+    
+    // Convert Supabase format to FoodRequirement format
+    const convertSupabaseToRequirement = (item: any): FoodRequirement => ({
+      id: item.id,
+      receiverId: item.ngo_id,
+      receiverName: 'Receiver',
+      organizationName: item.title || 'Organization',
+      title: item.title,
+      foodType: item.food_type,
+      quantity: item.quantity.toString(),
+      unit: item.unit,
+      urgency: item.urgency,
+      description: item.description,
+      location: {
+        address: item.delivery_address,
+        lat: item.delivery_latitude,
+        lng: item.delivery_longitude
+      },
+      neededBy: item.needed_by,
+      servingSize: item.serving_size?.toString() || '0',
+      status: (item.status === 'active' ? 'active' : 
+               item.status === 'matched' ? 'matched' : 'fulfilled') as FoodRequirement['status'],
+      createdAt: item.created_at,
+      updatedAt: item.updated_at
     });
-    console.log(`🔥 Found ${requirements.length} requirements from Firebase for receiver: ${receiverId}`);
-    // Return in reverse order to show newest first
-    callback(requirements.reverse());
-  });
-  return () => {
-    off(requirementsRef, 'value', listener);
-  };
+    
+    const requirements = supabaseRequirements.map(convertSupabaseToRequirement);
+    callback(requirements);
+    
+    // Set up real-time listener using Supabase subscriptions
+    const subscription = supabase
+      .channel(`requirements-${receiverId}`)
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'requests', filter: `ngo_id=eq.${receiverId}` },
+        async (payload: any) => {
+          console.log('� Supabase real-time update:', payload);
+          // Refetch all requirements on any change
+          const updatedRequirements = await requestService.getByNGO(receiverId);
+          const converted = updatedRequirements.map(convertSupabaseToRequirement);
+          callback(converted);
+        }
+      )
+      .subscribe();
+    
+    // Return unsubscribe function
+    return () => {
+      subscription.unsubscribe();
+    };
+    
+  } catch (error) {
+    console.error('❌ Error setting up requirements listener from Supabase:', error);
+    // Return a no-op unsubscribe function
+    return () => {};
+  }
 };
 
 // Match functions
-export const createMatch = async (match: Omit<Match, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
-  const isAvailable = await getDatabaseAvailability();
-  if (!isAvailable) {
-    const newId = Date.now().toString();
+export const createMatch = async (match: Omit<Match, 'id' | 'createdAt' | 'updatedAt'>, actualQuantity?: number): Promise<string> => {
+  console.log('🤝 Creating match record (transactions table removed from DB):', match);
+  
+  try {
+    // NOTE: The transactions table was removed in migration 003_optimize_schema.sql
+    // We now track completed donations via food_items status = 'collected'
+    // and fulfilled requests via requests status = 'fulfilled'
+    
+    // Just save to Firebase for real-time updates
+    const matchesRef = ref(database, 'matches');
+    const newMatchRef = push(matchesRef);
+    
     const matchData: Match = {
       ...match,
-      id: newId,
+      id: newMatchRef.key!,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
-    mockMatches.push(matchData);
-    console.log('Mock match created:', matchData);
-    return newId;
+    
+    await set(newMatchRef, matchData);
+    console.log('✅ Match record created in Firebase with ID:', newMatchRef.key);
+    
+    return newMatchRef.key!;
+  } catch (error) {
+    console.error('❌ Error creating match:', error);
+    throw error;
   }
-
-  const matchesRef = ref(database, 'matches');
-  const newMatchRef = push(matchesRef);
-  
-  const matchData: Match = {
-    ...match,
-    id: newMatchRef.key!,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  };
-  
-  await set(newMatchRef, matchData);
-  return newMatchRef.key!;
 };
 
 export const updateMatchStatus = async (matchId: string, status: Match['status']): Promise<void> => {
@@ -528,77 +635,147 @@ let donationsListenerTimeout: NodeJS.Timeout | null = null;
 let requirementsListenerTimeout: NodeJS.Timeout | null = null;
 
 export const listenToAvailableDonations = (callback: (donations: FoodDonation[]) => void) => {
-  if (!getDatabaseAvailabilitySync()) {
-    console.log('📦 Using mock data for available donations');
-    const getMockDonations = () => {
-      const donations = mockDonations.filter(d => d.status === 'pending');
-      console.log('📦 Mock available donations found:', donations.length);
-      callback(donations);
-    };
-
-    getMockDonations();
-    return subscribe(donationsListeners, getMockDonations);
-  }
-
-  const availableDonationsRef = query(
-    ref(database, 'donations'), 
-    orderByChild('status'), 
-    equalTo('pending')
-  );
+  console.log('� Setting up listener for available donations (Supabase ONLY)');
   
-  return onValue(availableDonationsRef, (snapshot) => {
-    // Debounce rapid updates
-    if (donationsListenerTimeout) {
-      clearTimeout(donationsListenerTimeout);
-    }
-    
-    donationsListenerTimeout = setTimeout(() => {
-      const donations: FoodDonation[] = [];
-      snapshot.forEach((child) => {
-        donations.push(child.val());
-      });
-      callback(donations);
-    }, 100);
+  // Convert Supabase format to FoodDonation format
+  const convertSupabaseToFoodDonation = (item: any): FoodDonation => ({
+    id: item.id,
+    donorId: item.donor_id,
+    donorName: 'Donor',
+    foodType: item.food_type,
+    quantity: item.quantity.toString(),
+    unit: item.unit,
+    description: item.description,
+    location: {
+      address: item.pickup_address,
+      lat: item.pickup_latitude,
+      lng: item.pickup_longitude
+    },
+    pickupTime: item.pickup_time,
+    expiryDate: item.expiry_date,
+    imageUrl: item.image_url || undefined,
+    status: (item.status === 'available' ? 'pending' : 
+             item.status === 'reserved' ? 'matched' : 
+             item.status === 'collected' ? 'completed' : 'expired') as FoodDonation['status'],
+    createdAt: item.created_at,
+    updatedAt: item.updated_at
   });
+
+  // Initial fetch
+  const fetchAndCallback = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('food_items')
+        .select('*')
+        .eq('status', 'available')
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('❌ Error fetching available donations:', error);
+        callback([]);
+        return;
+      }
+      
+      const donations = (data || []).map(convertSupabaseToFoodDonation);
+      console.log(`💾 Found ${donations.length} available donations from Supabase`);
+      callback(donations);
+    } catch (error) {
+      console.error('❌ Error in fetchAndCallback:', error);
+      callback([]);
+    }
+  };
+
+  // Call initial fetch
+  fetchAndCallback();
+
+  // Set up real-time subscription
+  const subscription = supabase
+    .channel('available-donations')
+    .on('postgres_changes', 
+      { event: '*', schema: 'public', table: 'food_items', filter: 'status=eq.available' },
+      (payload: any) => {
+        console.log('🔄 Supabase real-time update for donations:', payload);
+        fetchAndCallback();
+      }
+    )
+    .subscribe();
+
+  // Return unsubscribe function
+  return () => {
+    subscription.unsubscribe();
+  };
 };
 
 export const listenToActiveRequirements = (callback: (requirements: FoodRequirement[]) => void) => {
-  console.log('👂 listenToActiveRequirements called');
+  console.log('👂 Setting up listener for active requirements (Supabase ONLY)');
   
-  if (!getDatabaseAvailabilitySync()) {
-    console.log('📋 Using mock data for requirements');
-    const getMockRequirements = () => {
-      const requirements = mockRequirements.filter(r => r.status === 'active');
-      console.log('📋 Mock requirements found:', requirements.length);
-      callback(requirements);
-    };
-
-    getMockRequirements(); // Initial call
-    return subscribe(requirementsListeners, getMockRequirements); // Subscribe to future changes
-  }
-
-  console.log('🔥 Using real Firebase for active requirements');
-  const activeRequirementsRef = query(
-    ref(database, 'requirements'), 
-    orderByChild('status'), 
-    equalTo('active')
-  );
-  
-  return onValue(activeRequirementsRef, (snapshot) => {
-    // Debounce rapid updates
-    if (requirementsListenerTimeout) {
-      clearTimeout(requirementsListenerTimeout);
-    }
-    
-    requirementsListenerTimeout = setTimeout(() => {
-      const requirements: FoodRequirement[] = [];
-      snapshot.forEach((child) => {
-        requirements.push(child.val());
-      });
-      console.log(`🔥 Found ${requirements.length} active requirements from Firebase`);
-      callback(requirements);
-    }, 100);
+  // Convert Supabase format to FoodRequirement format
+  const convertSupabaseToRequirement = (item: any): FoodRequirement => ({
+    id: item.id,
+    receiverId: item.ngo_id,
+    receiverName: 'Receiver',
+    organizationName: item.title || 'Organization',
+    title: item.title,
+    foodType: item.food_type,
+    quantity: item.quantity.toString(),
+    unit: item.unit,
+    urgency: item.urgency,
+    description: item.description,
+    location: {
+      address: item.delivery_address,
+      lat: item.delivery_latitude,
+      lng: item.delivery_longitude
+    },
+    neededBy: item.needed_by,
+    servingSize: item.serving_size?.toString() || '0',
+    status: item.status,
+    createdAt: item.created_at,
+    updatedAt: item.updated_at
   });
+
+  // Initial fetch
+  const fetchAndCallback = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('requests')
+        .select('*')
+        .eq('status', 'active')
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('❌ Error fetching active requirements:', error);
+        callback([]);
+        return;
+      }
+      
+      const requirements = (data || []).map(convertSupabaseToRequirement);
+      console.log(`💾 Found ${requirements.length} active requirements from Supabase`);
+      callback(requirements);
+    } catch (error) {
+      console.error('❌ Error in fetchAndCallback:', error);
+      callback([]);
+    }
+  };
+
+  // Call initial fetch
+  fetchAndCallback();
+
+  // Set up real-time subscription
+  const subscription = supabase
+    .channel('active-requirements')
+    .on('postgres_changes', 
+      { event: '*', schema: 'public', table: 'requests', filter: 'status=eq.active' },
+      (payload: any) => {
+        console.log('� Supabase real-time update for requirements:', payload);
+        fetchAndCallback();
+      }
+    )
+    .subscribe();
+
+  // Return unsubscribe function
+  return () => {
+    subscription.unsubscribe();
+  };
 };
 
 // Analytics function with caching

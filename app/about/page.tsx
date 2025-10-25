@@ -1,13 +1,30 @@
-import { Heart, Sparkles, MapPin, Clock, UserCheck, ShieldCheck, TrendingUp, ArrowRight } from 'lucide-react';
+'use client';
+
+import { Heart, Sparkles, MapPin, Clock, UserCheck, ShieldCheck, TrendingUp, ArrowRight, Home } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { Button } from '@/components/ui/button';
 
 export default function AboutPage() {
+  const router = useRouter();
   return (
     <main className="relative min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 pb-24 overflow-x-hidden pt-16">
       {/* Decorative background blobs */}
       <div className="absolute -top-32 -left-32 w-96 h-96 bg-green-200 opacity-30 rounded-full blur-3xl z-0" />
       <div className="absolute top-1/2 right-0 w-80 h-80 bg-blue-200 opacity-20 rounded-full blur-2xl z-0" />
       <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-96 h-32 bg-green-100 opacity-20 rounded-full blur-2xl z-0" />
+      
+      {/* Back to Home Button */}
+      <div className="relative z-10 max-w-7xl mx-auto px-4 pt-4 pb-6">
+        <Button
+          onClick={() => router.push('/')}
+          variant="outline"
+          className="flex items-center gap-2 hover:bg-green-50 hover:border-green-300"
+        >
+          <Home className="h-4 w-4" />
+          Back to Home
+        </Button>
+      </div>
 
       {/* Hero Section */}
       <section className="relative z-10 max-w-3xl mx-auto text-center py-20 px-4">

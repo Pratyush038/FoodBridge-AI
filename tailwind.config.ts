@@ -116,6 +116,14 @@ const config: Config = {
             transform: 'translateX(0)',
           },
         },
+        'border-beam': {
+          '0%': {
+            'offset-distance': '0%',
+          },
+          '100%': {
+            'offset-distance': '100%',
+          },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
@@ -124,6 +132,7 @@ const config: Config = {
         'fade-up': 'fade-up 0.6s ease-out',
         'scale-in': 'scale-in 0.4s ease-out',
         'slide-in-right': 'slide-in-right 0.5s ease-out',
+        'border-beam': 'border-beam var(--duration) infinite linear',
       },
     },
   },

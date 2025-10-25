@@ -20,6 +20,7 @@ import {
   listenToAvailableDonations, 
   getRequirementsByReceiver,
   updateDonationStatus,
+  updateRequirementStatus,
   createMatch,
   createRequirement
 } from '@/lib/firebase-service';
@@ -65,12 +66,15 @@ export default function ReceiverDashboard() {
       d.status === 'pending'
     ).length;
     
-    // Urgent needs (high urgency active requests)
-    const urgentNeeds = myRequirements.filter(r => 
-      r.status === 'active' && r.urgency === 'high'
-    ).length;
+    // Urgent needs - donations expiring soon (within 24 hours) that need immediate pickup
+    const urgentNeeds = availableDonations.filter(d => {
+      if (d.status !== 'pending') return false;
+      const expiryDate = new Date(d.expiryDate);
+      const hoursUntilExpiry = (expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60);
+      return hoursUntilExpiry > 0 && hoursUntilExpiry <= 24;
+    }).length;
     
-    // Fulfilled this month
+    // Fulfilled this month - use matchedAt if available, otherwise createdAt
     const fulfilledThisMonth = myRequirements.filter(r => {
       if (r.status !== 'fulfilled') return false;
       const fulfilledDate = r.matchedAt ? new Date(r.matchedAt) : new Date(r.createdAt);
@@ -278,49 +282,58 @@ export default function ReceiverDashboard() {
       const organizationName = (session.user as any).organizationName || session.user.name;
       
       // Create a requirement record that is fulfilled by this donation
+      // Mark as FULFILLED - this is the final state, no further matching needed
+      const fulfillmentDate = new Date().toISOString();
       const newRequirementId = await createRequirement({
         receiverId: ngoId,
         receiverName: organizationName,
         organizationName: organizationName,
-        title: `Picked up: ${donation.foodType}`,
+        title: `Received: ${donation.foodType}`,
         foodType: donation.foodType,
         quantity: donation.quantity,
         unit: donation.unit,
-        description: `Picked up from ${donation.donorName}`,
+        description: `Received from ${donation.donorName}`,
         location: donation.location,
         neededBy: donation.expiryDate,
         urgency: 'low',
         servingSize: donation.quantity,
-        status: 'fulfilled' as const,
+        status: 'fulfilled' as const, // FINAL STATE - transaction complete
         matchedWith: donation.donorName,
-        matchedAt: new Date().toISOString()
+        matchedAt: fulfillmentDate
       });
       
-      console.log('✅ Created requirement with ID:', newRequirementId);
+      console.log('✅ Created fulfilled requirement with ID:', newRequirementId);
       
-      // Update the donation status
+      // Update the donation status to completed - FINAL STATE
+      // This updates both Supabase (food_items table) and Firebase
       await updateDonationStatus(donation.id!, 'completed', organizationName);
+      console.log('✅ Donation marked as completed in all databases');
       
-      // Try to create a match record (optional - non-blocking)
+      // Update the requirement status to fulfilled in Supabase
+      // (The requirement was created but we need to ensure it's marked as fulfilled)
+      await updateRequirementStatus(newRequirementId, 'fulfilled', donation.donorName);
+      console.log('✅ Requirement status updated to fulfilled in all databases');
+      
+      // Create a match/transaction record in both databases
       try {
         await createMatch({
           donationId: donation.id!,
           requirementId: newRequirementId,
           donorId: donation.donorId,
           receiverId: ngoId,
-          status: 'confirmed',
+          status: 'confirmed', // Transaction confirmed and completed
           distance: 0,
           matchScore: 100
-        }, parseFloat(donation.quantity)); // Pass actual quantity
-        console.log('✅ Match record created');
+        }, parseFloat(donation.quantity));
+        console.log('✅ Transaction record created in all databases');
       } catch (matchError) {
-        console.warn('⚠️ Failed to create match record (non-critical):', matchError);
+        console.warn('⚠️ Failed to create transaction record (non-critical):', matchError);
       }
       
       // Refresh data to update statistics
       fetchReceiverData();
       
-      toast.success('Pickup confirmed! Requirement created and statistics updated.', { 
+      toast.success('Pickup confirmed! Transaction completed in all databases.', { 
         id: 'confirm-pickup',
         duration: 4000 
       });
@@ -461,7 +474,7 @@ export default function ReceiverDashboard() {
                     <div>
                       <p className="text-sm font-medium text-gray-600 mb-1">Urgent Needs</p>
                       <p className="text-3xl font-bold text-gray-900 tracking-tight">{stats.urgentNeeds}</p>
-                      <p className="text-xs text-gray-500 mt-1">High priority</p>
+                      <p className="text-xs text-gray-500 mt-1">Expiring within 24h</p>
                     </div>
                     <div className="p-3 bg-orange-50 rounded-full">
                       <Bell className="h-8 w-8 text-orange-600" />

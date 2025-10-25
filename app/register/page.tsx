@@ -210,7 +210,6 @@ export default function Register() {
                 <SelectContent>
                   <SelectItem value="donor">Food Donor</SelectItem>
                   <SelectItem value="receiver">Food Receiver (NGO/Shelter)</SelectItem>
-                  <SelectItem value="admin">Administrator</SelectItem>
                 </SelectContent>
               </Select>
             </div>

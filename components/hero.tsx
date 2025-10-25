@@ -1,182 +1,42 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { ArrowRight, Heart, Utensils, Building } from 'lucide-react';
-import { motion, useInView, useSpring, Variants, useTransform } from 'framer-motion';
-import { useRef, FC } from 'react';
-import { LucideProps } from 'lucide-react';
-import Image from 'next/image';
-
-interface AnimatedNumberProps {
-  value: number;
-  label: string;
-  icon: FC<LucideProps>;
-}
-
-function AnimatedNumber({ value, label, icon: Icon }: AnimatedNumberProps) {
-  const ref = useRef(null);
-  const isInView = useInView(ref, { once: true });
-  const spring = useSpring(0, {
-    damping: 20,
-    stiffness: 100,
-    mass: 1
-  });
-
-  useEffect(() => {
-    if (isInView) {
-      spring.set(value);
-    }
-  }, [isInView, value, spring]);
-
-  const displayValue = useTransform(spring, (v) => Math.round(v).toLocaleString());
-
-  return (
-    <motion.div ref={ref} className="text-center p-6">
-      <div className="flex items-center justify-center">
-        <Icon className="h-8 w-8 text-indigo-500 mr-2" />
-        <motion.p
-          className="text-4xl font-bold text-gray-900"
-        >
-          {displayValue}
-        </motion.p>
-      </div>
-      <p className="text-lg text-gray-600 mt-1">{label}</p>
-    </motion.div>
-  );
-}
+import { DotPattern } from '@/components/ui/dot-pattern';
+import { cn } from '@/lib/utils';
+import { HeroContent } from './hero-content';
+import { HeroImage } from './hero-image';
+import { HeroStats } from './hero-stats';
 
 export default function Hero() {
-  const { data: session } = useSession();
-  const router = useRouter();
-  const [stats, setStats] = useState({
-    donations: 1500,
-    mealsServed: 450000,
-    cities: 50,
-  });
-
-  // This would fetch real data in a real app
-  useEffect(() => {
-    // Simulating a fetch for stats to make it feel more real
-    const timer = setTimeout(() => {
-      // In a real scenario, you would call getAnalyticsData()
-      // For now, we&#39;ll just use slightly higher numbers to show change
-      setStats({
-        donations: 1573,
-        mealsServed: 452108,
-        cities: 52,
-      });
-    }, 2000);
-    return () => clearTimeout(timer);
-  }, []);
-
-  const handleGetStarted = () => {
-    if (session) {
-      // User is logged in, go to their dashboard
-      router.push(`/${(session.user as any).role || 'donor'}`);
-    } else {
-      // User is not logged in, go to register page
-      router.push('/register');
-    }
-  };
-
-  const containerVariants: Variants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.2,
-      },
-    },
-  };
-
-  const itemVariants: Variants = {
-    hidden: { y: 20, opacity: 0 },
-    visible: {
-      y: 0,
-      opacity: 1,
-      transition: {
-        duration: 0.5,
-      },
-    },
-  };
-
-  const rightVariants: Variants = {
-    hidden: { x: 100, opacity: 0 },
-    visible: {
-      x: 0,
-      opacity: 1,
-      transition: {
-        duration: 0.8,
-        ease: "easeInOut",
-      },
-    },
-  };
-
   return (
-    <section className="bg-gradient-to-br from-green-50 to-blue-50 py-20 md:py-32">
-      <motion.div 
-        className="container mx-auto px-4"
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-      >
-        <div className="grid md:grid-cols-2 gap-12 items-center">
-          <div className="space-y-6">
-            <motion.h1 
-              className="text-4xl md:text-6xl font-bold text-gray-900 leading-tight tracking-tight"
-              variants={itemVariants}
-            >
-              Bridge the Gap Between <span className="text-green-600 bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">Surplus Food</span> and Those in Need.
-            </motion.h1>
-            <motion.p 
-              className="text-lg md:text-xl text-gray-600 leading-relaxed"
-              variants={itemVariants}
-            >
-              FoodBridge AI uses intelligent matching to connect food donors with NGOs and shelters, ensuring that excess food reaches the plates of the hungry, not landfills.
-            </motion.p>
-            <motion.div className="flex space-x-4" variants={itemVariants}>
-              <Button size="lg" onClick={handleGetStarted} className="shadow-lg hover:shadow-xl transition-shadow duration-300">
-                Get Started <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-            </motion.div>
+    <section className="relative min-h-screen py-20 md:py-32 overflow-hidden bg-gradient-to-br from-gray-50 via-green-50/30 to-blue-50/30">
+      {/* Dot Pattern Background */}
+      <DotPattern
+        className={cn(
+          "absolute inset-0 h-full w-full",
+          "[mask-image:radial-gradient(800px_circle_at_center,white,transparent)]",
+          "text-gray-500/50" // darker base + good visibility
+        )}
+      />
+      
+      {/* Content */}
+      <div className="container mx-auto px-4 relative z-10">
+        <div className="grid md:grid-cols-2 gap-12 lg:gap-20 items-start">
+          {/* Left: Hero Content */}
+          <div className="pt-12">
+            <HeroContent />
           </div>
-          <motion.div className="hidden md:block relative h-[500px]" variants={rightVariants}>
-            <div className="relative w-full h-full rounded-2xl overflow-hidden shadow-2xl">
-              <Image
-                src="/happy-photo.png"
-                alt="Food donation connecting communities"
-                fill
-                className="object-cover"
-                priority
-              />
-            </div>
-          </motion.div>
+          
+          {/* Right: Hero Image */}
+          <div className="hidden md:block pt-12">
+            <HeroImage />
+          </div>
         </div>
-
-        <motion.div 
-          className="mt-24"
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.8 }}
-        >
-          <div className="relative">
-            <div className="absolute inset-0 h-1/2 bg-white/30 backdrop blur-md rounder-xl border border-white/10" />
-            <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="max-w-4xl mx-auto">
-                <dl className="rounded-lg bg-white shadow-lg hover:shadow-xl transition-shadow duration-300 sm:grid sm:grid-cols-3">
-                  <AnimatedNumber value={stats.donations} label="Donations" icon={Heart} />
-                  <AnimatedNumber value={stats.mealsServed} label="Meals Served" icon={Utensils} />
-                  <AnimatedNumber value={stats.cities} label="Cities Covered" icon={Building} />
-                </dl>
-              </div>
-            </div>
-          </div>
-        </motion.div>
-      </motion.div>
+        
+        {/* Stats Row - Below Everything */}
+        <div className="mt-20 md:mt-32">
+          <HeroStats />
+        </div>
+      </div>
     </section>
   );
 }

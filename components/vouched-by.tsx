@@ -2,6 +2,8 @@
 
 import { motion } from 'framer-motion';
 import Image from 'next/image';
+import { DotPattern } from '@/components/ui/dot-pattern';
+import { cn } from '@/lib/utils';
 
 const logos = [
   { name: 'Akshaya Patra', logo: '/akshaya-patra-logo.png', url: 'https://www.akshayapatra.org' },
@@ -13,8 +15,17 @@ const logos = [
 
 export default function VouchedBy() {
   return (
-    <section className="py-16 bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section className="relative py-20 bg-gradient-to-br from-white via-gray-50 to-white overflow-hidden">
+      {/* Dot Pattern Background */}
+      <DotPattern
+        className={cn(
+          "absolute inset-0 h-full w-full",
+          "[mask-image:radial-gradient(500px_circle_at_center,white,transparent)]",
+          "text-gray-300/30"
+        )}
+      />
+      
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -44,12 +55,18 @@ export default function VouchedBy() {
               whileHover={{ scale: 1.05 }}
               className="flex justify-center"
             >
-              <a href={company.url} target="_blank" rel="noopener noreferrer" className="block relative h-12 w-40">
+              <a 
+                href={company.url} 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="block relative h-16 w-40 p-4 bg-white/50 backdrop-blur-sm rounded-xl shadow-md hover:shadow-lg transition-all duration-300 border border-white/20"
+              >
                 <Image
                   src={company.logo}
                   alt={company.name}
                   fill={true}
                   style={{objectFit: 'contain'}}
+                  className="p-2"
                 />
               </a>
             </motion.div>

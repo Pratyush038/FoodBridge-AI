@@ -1,63 +1,201 @@
 # FoodBridge AI
 
-FoodBridge AI is an intelligent platform that connects surplus food providers, such as restaurants, grocers, and event organisers, with verified recipients through a network of NGOs, shelters, and community kitchens. Powered by automation, AI-based matching, and hybrid database architecture, it ensures timely, efficient, and equitable food distribution, reducing waste and fighting hunger at scale.
+An intelligent platform connecting food donors with verified recipients through NGOs, powered by AI matching and hybrid database architecture.
 
-## 🌟 Key Features
+## ✨ Features
 
-- **🤖 AI-Powered Matching**: Smart algorithms connect donors with nearby organizations using machine learning
-- **💬 Gemini AI Chatbot**: Interactive assistant for queries about donations, availability, and matching
-- **🗄️ Hybrid Database Architecture** (SQL + NoSQL): 
-  - **PostgreSQL via Supabase**: Structured relational data with ACID compliance
-  - **Firebase Realtime Database**: Real-time NoSQL for chat, logs, and live notifications
-  - See [DATABASE_ARCHITECTURE.md](DATABASE_ARCHITECTURE.md) for details
-- **📊 Advanced DBMS Features**: 
-  - Stored procedures for complex operations
-  - Triggers for automatic status updates
-  - Views for analytics and reporting
-- **🗺️ Real-time Tracking**: Monitor donations with live updates and geolocation
-- **👥 Multi-role Support**: Donors, NGOs/receivers, and administrators
-- **📈 Analytics Dashboard**: Comprehensive insights and performance metrics
-- **📱 Mobile Responsive**: Works seamlessly on all devices
+- **🤖 AI-Powered Matching**: Smart algorithms connect donors with nearby organizations
+- **💬 Gemini AI Chatbot**: Interactive assistant for platform guidance
+- **🗄️ Hybrid Database**: PostgreSQL (Supabase) + Firebase Realtime Database
+- **🗺️ Real-time Tracking**: Live donation monitoring with Google Maps
+- **👥 Multi-role Support**: Donors, NGOs/Receivers, and Administrators
+- **� Analytics Dashboard**: Comprehensive insights and metrics
+- **📱 Responsive Design**: Works seamlessly across all devices
 
-## 🏗️ Architecture Overview
+## 🏗️ Tech Stack
+
+### Frontend
+- Next.js 14 (App Router)
+- TypeScript
+- React 18
+- Tailwind CSS + shadcn/ui
+- Recharts
+- Google Maps API
+
+### Backend & Database
+- PostgreSQL (Supabase)
+- Firebase Realtime Database
+- NextAuth.js
+- Google Gemini AI
+- Next.js API Routes
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Node.js 18+
+- npm/yarn/pnpm
+- Supabase account
+- Firebase project
+- Google Gemini API key
+- Google Maps API key
+
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/Pratyush038/FoodBridge-AI.git
+   cd FoodBridge-AI
+   ```
+
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
+
+3. **Configure environment variables**
+   
+   Create `.env.local` file:
+   ```env
+   # Supabase
+   NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+   SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+   
+   # Firebase
+   NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-project-id
+   NEXT_PUBLIC_FIREBASE_API_KEY=your-api-key
+   NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-auth-domain
+   NEXT_PUBLIC_FIREBASE_DATABASE_URL=your-database-url
+   NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your-storage-bucket
+   NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your-sender-id
+   NEXT_PUBLIC_FIREBASE_APP_ID=your-app-id
+   
+   # Google Services
+   GEMINI_API_KEY=your-gemini-api-key
+   NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your-maps-api-key
+   
+   # NextAuth
+   NEXTAUTH_SECRET=your-nextauth-secret
+   NEXTAUTH_URL=http://localhost:3000
+   GOOGLE_CLIENT_ID=your-google-client-id
+   GOOGLE_CLIENT_SECRET=your-google-client-secret
+   ```
+
+4. **Set up databases**
+   
+   - **Supabase**: Run migrations from `supabase/migrations/`
+   - **Firebase**: Enable Realtime Database in Firebase Console
+
+5. **Run development server**
+   ```bash
+   npm run dev
+   ```
+
+6. **Open browser**
+   
+   Navigate to [http://localhost:3000](http://localhost:3000)
+
+## 📊 Database Architecture
+
+FoodBridge AI uses a hybrid database approach:
+
+- **PostgreSQL (Supabase)**: Structured data (users, donations, requests, transactions)
+- **Firebase**: Real-time features (chat, notifications, activity feeds)
+
+For detailed architecture, see [DATABASE_ARCHITECTURE.md](./DATABASE_ARCHITECTURE.md)
+
+## 🗂️ Project Structure
 
 ```
-┌─────────────────────────────────────────────────────┐
-│              Frontend (Next.js + React)              │
-│  Donor Dashboard | NGO Dashboard | Admin Panel      │
-│  AI Chatbot | Real-time Chat | Analytics            │
-└──────────────┬──────────────────────────────────────┘
-               │
-        API Routes (TypeScript)
-               │
-    ┌──────────┴──────────┐
-    │                     │
-    ▼                     ▼
-┌─────────────┐     ┌─────────────┐
-│  Supabase   │     │  Firebase   │
-│ (PostgreSQL)│     │   (NoSQL)   │
-├─────────────┤     ├─────────────┤
-│ • Donors    │     │ • Chat      │
-│ • NGOs      │     │ • Logs      │
-│ • Food Items│     │ • Updates   │
-│ • Requests  │     │ • AI Cache  │
-│ • Trans.    │     └─────────────┘
-│ • Feedback  │
-│ • Triggers  │
-│ • Views     │
-│ • Functions │
-└─────────────┘
+FoodBridgeAI/
+├── app/                    # Next.js app directory
+│   ├── api/               # API routes
+│   ├── donor/             # Donor dashboard
+│   ├── receiver/          # NGO dashboard
+│   ├── admin/             # Admin panel
+│   └── ...
+├── components/            # React components
+│   ├── ui/               # UI components (shadcn)
+│   └── ...
+├── lib/                   # Services & utilities
+│   ├── supabase-service.ts
+│   ├── firebase-service.ts
+│   ├── ai-matching-engine.ts
+│   ├── gemini-service.ts
+│   ├── user-service.ts
+│   └── utils.ts
+├── supabase/
+│   └── migrations/       # Database migrations
+└── ...
 ```
 
-## 📋 Lab Requirements Compliance
+## 🎯 Key Features
 
-✅ **5-6 Entities**: Donors, NGOs, Food Items, Requests, Transactions, Feedback  
-✅ **SQL Database**: Supabase (PostgreSQL) with proper schema, constraints, and relationships  
-✅ **NoSQL Database**: Firebase Realtime Database for real-time features  
-✅ **DBMS Concepts**: Stored procedures, triggers, views, RLS policies  
-✅ **Innovative Component**: AI-based matching engine with ML algorithms  
-✅ **Backend**: Next.js API routes (TypeScript) - No PHP  
-✅ **Additional**: Gemini AI chatbot for enhanced user experience
+### For Donors
+- Register and create profile
+- Upload food donations with details
+- View AI-matched recipient requests
+- Track donation history
+- Real-time chat with NGOs
+
+### For NGOs/Receivers
+- Register organization
+- Post food requirements
+- Browse available donations
+- Manage pickups
+- Track organization statistics
+
+### For Administrators
+- System-wide analytics
+- User management
+- Monitor transactions
+- Generate reports
+
+## 🤖 AI Matching Engine
+
+The AI matching algorithm considers:
+
+- Food type compatibility (25%)
+- Location proximity (30%)
+- Quantity matching (20%)
+- Request urgency (multiplier)
+- Donor reliability (15%)
+- NGO rating (10%)
+
+## 📄 API Routes
+
+### Core Endpoints
+- `/api/donors` - Donor management
+- `/api/ngos` - NGO management
+- `/api/food-items` - Food donation CRUD
+- `/api/requests` - Food requirement CRUD
+- `/api/transactions` - Transaction management
+- `/api/feedback` - Feedback system
+- `/api/chatbot` - AI chatbot interface
+- `/api/analytics` - Dashboard analytics
+
+## 🧪 Testing
+
+```bash
+npm run test:integration
+```
+
+## 📝 License
+
+This project is licensed under the MIT License.
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## 📧 Contact
+
+For questions or support, please open an issue on GitHub.
+
+---
+
+Built with ❤️ for reducing food waste and fighting hunger
 
 ## 🚀 Tech Stack
 

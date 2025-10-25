@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Users, Heart, TrendingUp, Shield, ArrowRight, Lock } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { DotPattern } from '@/components/ui/dot-pattern';
+import { cn } from '@/lib/utils';
 
 export default function About() {
   const { data: session, status } = useSession();
@@ -70,8 +72,17 @@ export default function About() {
   };
 
   return (
-    <div className="py-12 bg-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="relative py-20 bg-gradient-to-br from-gray-50 via-white to-gray-50 overflow-hidden">
+      {/* Dot Pattern Background */}
+      <DotPattern
+        className={cn(
+          "absolute inset-0 h-full w-full",
+          "[mask-image:radial-gradient(600px_circle_at_center,white,transparent)]",
+          "text-gray-300/30"
+        )}
+      />
+      
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <motion.div 
           className="lg:text-center"
           initial="hidden"
@@ -96,9 +107,9 @@ export default function About() {
             viewport={{ once: true, amount: 0.2 }}
             variants={staggerContainer}
           >
-            {features.map((feature) => (
+            {features.map((feature, index) => (
               <motion.div key={feature.name} variants={fadeIn}>
-                <Card className="hover:shadow-xl hover:-translate-y-1 transition-all duration-300 h-full border-gray-200/60">
+                <Card className="relative hover:shadow-xl hover:-translate-y-1 transition-all duration-300 h-full bg-white/70 backdrop-blur-md border-2 border-green-500">
                   <CardContent className="p-6">
                     <div className="flex">
                       <div className="flex-shrink-0">
@@ -120,7 +131,7 @@ export default function About() {
         </div>
 
         <motion.div 
-          className="mt-16 bg-gradient-to-r from-green-600 to-blue-600 rounded-lg shadow-xl overflow-hidden"
+          className="mt-16 bg-gradient-to-r from-green-600 to-emerald-600 rounded-2xl shadow-xl overflow-hidden"
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true, amount: 0.5 }}
@@ -162,7 +173,7 @@ export default function About() {
                 <Button 
                   size="lg" 
                   variant="outline" 
-                  className="border-white text-green hover:bg-white hover:text-green-600"
+                  className="border-white text-green-600 hover:bg-white hover:text-green-600"
                   onClick={handleNeedFood}
                 >
                   Need Food?

@@ -15,7 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Upload, History, TrendingUp, Users, MapPin, Clock, Bell, Plus, ExternalLink, Phone, Search, Filter, CheckCircle, Heart } from 'lucide-react';
-import { getDonationsByDonor, listenToActiveRequirements, FoodDonation, FoodRequirement, updateRequirementStatus, createMatch, createDonation } from '@/lib/firebase-service';
+import { getDonationsByDonor, listenToActiveRequirements, FoodDonation, FoodRequirement, updateRequirementStatus, updateDonationStatus, createMatch, createDonation } from '@/lib/firebase-service';
 import { ensureUserInSupabase } from '@/lib/user-service';
 import { MapMarker } from '@/components/map-component';
 import { toast } from 'sonner';
@@ -55,7 +55,7 @@ export default function DonorDashboard() {
       d.status === 'pending' || d.status === 'matched'
     ).length;
     
-    // Completed donations this month
+    // Completed donations this month - use matchedAt if available, otherwise createdAt
     const completedThisMonth = donations.filter(d => {
       if (d.status !== 'completed') return false;
       const completedDate = d.matchedAt ? new Date(d.matchedAt) : new Date(d.createdAt);
@@ -301,46 +301,55 @@ export default function DonorDashboard() {
         : new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
       
       // Create a donation record that fulfills this requirement
+      // Mark as COMPLETED - this is the final state, no further matching needed
+      const completionDate = new Date().toISOString();
       const newDonationId = await createDonation({
         donorId: donorId,
         donorName: donorName,
         foodType: requirement.foodType,
         quantity: requirement.quantity,
         unit: requirement.unit,
-        description: `Fulfilling requirement: ${requirement.title}`,
+        description: `Fulfilled requirement: ${requirement.title}`,
         location: requirement.location,
-        pickupTime: new Date().toISOString(),
+        pickupTime: completionDate,
         expiryDate: expiryDate,
-        status: 'completed' as const,
+        status: 'completed' as const, // FINAL STATE - transaction complete
         matchedWith: requirement.organizationName,
-        matchedAt: new Date().toISOString()
+        matchedAt: completionDate
       });
       
-      console.log('✅ Created donation with ID:', newDonationId);
+      console.log('✅ Created completed donation with ID:', newDonationId);
       
-      // Update the requirement status
+      // Update the requirement status to fulfilled - FINAL STATE
+      // This updates both Supabase (requests table) and Firebase
       await updateRequirementStatus(requirement.id!, 'fulfilled', donorName);
+      console.log('✅ Requirement marked as fulfilled in all databases');
       
-      // Try to create a match record (optional - non-blocking)
+      // Update the donation status to completed in Supabase
+      // (The donation was created but we need to ensure it's marked as collected)
+      await updateDonationStatus(newDonationId, 'completed', requirement.organizationName);
+      console.log('✅ Donation status updated to completed in all databases');
+      
+      // Create a match/transaction record in both databases
       try {
         await createMatch({
           donationId: newDonationId,
           requirementId: requirement.id!,
           donorId: donorId,
           receiverId: requirement.receiverId,
-          status: 'confirmed',
+          status: 'confirmed', // Transaction confirmed and completed
           distance: 0,
           matchScore: 100
-        }, parseFloat(requirement.quantity)); // Pass actual quantity
-        console.log('✅ Match record created');
+        }, parseFloat(requirement.quantity));
+        console.log('✅ Transaction record created in all databases');
       } catch (matchError) {
-        console.warn('⚠️ Failed to create match record (non-critical):', matchError);
+        console.warn('⚠️ Failed to create transaction record (non-critical):', matchError);
       }
       
       // Refresh data to update statistics
       fetchDonorData();
       
-      toast.success('Drop-off confirmed! Donation created and statistics updated.', { 
+      toast.success('Drop-off confirmed! Transaction completed in all databases.', { 
         id: 'confirm-dropoff',
         duration: 4000 
       });

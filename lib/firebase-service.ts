@@ -605,30 +605,50 @@ export const getRequirementsByReceiver = async (receiverId: string, callback: (r
 
 // Match functions
 export const createMatch = async (match: Omit<Match, 'id' | 'createdAt' | 'updatedAt'>, actualQuantity?: number): Promise<string> => {
-  console.log('🤝 Creating match record in Firebase (NoSQL):', match);
+  console.log('🤝 Creating match/transaction record in both databases:', match);
   
   try {
-    // Save match to Firebase Realtime Database (NoSQL - real-time matching data)
+    // 1. Create transaction in Supabase (SQL - primary structured data)
+    console.log('💾 Creating transaction in Supabase PostgreSQL...');
+    const transactionData = {
+      donor_id: match.donorId,
+      ngo_id: match.receiverId,
+      food_item_id: match.donationId,
+      request_id: match.requirementId,
+      quantity_transferred: actualQuantity || 0,
+      status: match.status === 'confirmed' ? 'completed' as const : 
+              match.status === 'pending' ? 'pending' as const : 'completed' as const,
+      pickup_time: new Date().toISOString(),
+      delivery_time: new Date().toISOString(),
+      match_score: match.matchScore,
+      distance_km: match.distance
+    };
+    
+    const supabaseTransaction = await transactionService.create(transactionData);
+    let transactionId = supabaseTransaction?.id || '';
+    console.log('✅ Transaction created in Supabase (SQL) with ID:', transactionId);
+    
+    // 2. Save match to Firebase Realtime Database (NoSQL - real-time matching data)
     const matchesRef = ref(database, 'matches');
     const newMatchRef = push(matchesRef);
     
     const matchData: Match = {
       ...match,
-      id: newMatchRef.key!,
+      id: transactionId || newMatchRef.key!,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
     
     await set(newMatchRef, matchData);
-    console.log('✅ Match record created in Firebase (NoSQL) with ID:', newMatchRef.key);
+    console.log('✅ Match record synced to Firebase (NoSQL) with key:', newMatchRef.key);
     
-    // Create activity log in Firebase (NoSQL only)
+    // 3. Create activity log in Firebase (NoSQL only)
     const activityRef = ref(database, 'activity_feed');
     const newActivityRef = push(activityRef);
     await set(newActivityRef, {
       id: newActivityRef.key,
       type: 'match_created',
-      matchId: newMatchRef.key,
+      matchId: transactionId || newMatchRef.key,
       donationId: match.donationId,
       requirementId: match.requirementId,
       donorId: match.donorId,
@@ -636,13 +656,13 @@ export const createMatch = async (match: Omit<Match, 'id' | 'createdAt' | 'updat
       matchScore: match.matchScore,
       distance: match.distance,
       timestamp: new Date().toISOString(),
-      message: `AI matched donation with requirement (${match.matchScore}% match, ${match.distance}km distance)`
+      message: `Transaction completed (${match.matchScore}% match, ${match.distance}km distance)`
     });
-    console.log('✅ Match activity logged in Firebase (NoSQL)');
+    console.log('✅ Transaction activity logged in Firebase (NoSQL)');
     
-    return newMatchRef.key!;
+    return transactionId || newMatchRef.key!;
   } catch (error) {
-    console.error('❌ Error creating match:', error);
+    console.error('❌ Error creating match/transaction:', error);
     throw error;
   }
 };

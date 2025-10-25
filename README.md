@@ -6,9 +6,10 @@ FoodBridge AI is an intelligent platform that connects surplus food providers, s
 
 - **🤖 AI-Powered Matching**: Smart algorithms connect donors with nearby organizations using machine learning
 - **💬 Gemini AI Chatbot**: Interactive assistant for queries about donations, availability, and matching
-- **🗄️ Hybrid Database Architecture**: 
-  - **Supabase (PostgreSQL)**: Structured data with ACID compliance
-  - **Firebase**: Real-time updates, chat, and live notifications
+- **🗄️ Hybrid Database Architecture** (SQL + NoSQL): 
+  - **PostgreSQL via Supabase**: Structured relational data with ACID compliance
+  - **Firebase Realtime Database**: Real-time NoSQL for chat, logs, and live notifications
+  - See [DATABASE_ARCHITECTURE.md](DATABASE_ARCHITECTURE.md) for details
 - **📊 Advanced DBMS Features**: 
   - Stored procedures for complex operations
   - Triggers for automatic status updates

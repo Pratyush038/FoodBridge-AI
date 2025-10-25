@@ -258,17 +258,14 @@ const getDatabaseAvailabilitySync = () => {
 
 // Donation functions
 export const createDonation = async (donation: Omit<FoodDonation, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
-  console.log('📝 Creating donation - NO FALLBACK TO MOCK DATA:', donation);
+  console.log('📝 Creating donation - Dual database write:', donation);
   
   try {
-    // First, save to Supabase (primary database)
-    console.log('💾 Saving to Supabase...');
+    // 1. Save to Supabase (SQL - primary structured data)
+    console.log('💾 Saving to Supabase PostgreSQL...');
     
-    // Ensure timestamps are in ISO format
     const pickupTime = donation.pickupTime || new Date().toISOString();
     const expiryDate = donation.expiryDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-    
-    console.log('⏰ Timestamps:', { pickupTime, expiryDate });
     
     const supabaseData = {
       donor_id: donation.donorId,
@@ -288,13 +285,12 @@ export const createDonation = async (donation: Omit<FoodDonation, 'id' | 'create
     const supabaseResult = await foodItemService.create(supabaseData);
     
     if (!supabaseResult) {
-      console.error('❌ Supabase returned null - donation not saved!');
-      throw new Error('Failed to save donation to Supabase - received null response');
+      throw new Error('Failed to save donation to Supabase');
     }
     
-    console.log('✅ Saved to Supabase with ID:', supabaseResult.id);
+    console.log('✅ Saved to Supabase (SQL) with ID:', supabaseResult.id);
     
-    // Also save to Firebase for real-time updates (optional)
+    // 2. Save to Firebase Realtime Database (NoSQL - for real-time sync)
     const firebaseData: FoodDonation = {
       ...donation,
       id: supabaseResult.id,
@@ -302,17 +298,31 @@ export const createDonation = async (donation: Omit<FoodDonation, 'id' | 'create
       updatedAt: supabaseResult.created_at
     };
     
-    try {
-      const donationsRef = ref(database, `donations/${supabaseResult.id}`);
-      await set(donationsRef, firebaseData);
-      console.log('✅ Synced to Firebase for real-time updates');
-    } catch (firebaseError) {
-      console.warn('⚠️ Firebase sync failed (non-critical):', firebaseError);
-    }
+    const donationsRef = ref(database, `donations/${supabaseResult.id}`);
+    await set(donationsRef, firebaseData);
+    console.log('✅ Synced to Firebase (NoSQL) for real-time updates');
+    
+    // 3. Create activity log in Firebase (NoSQL only - real-time feed)
+    const activityRef = ref(database, 'activity_feed');
+    const newActivityRef = push(activityRef);
+    await set(newActivityRef, {
+      id: newActivityRef.key,
+      type: 'donation_created',
+      donationId: supabaseResult.id,
+      donorId: donation.donorId,
+      donorName: donation.donorName,
+      foodType: donation.foodType,
+      quantity: donation.quantity,
+      unit: donation.unit,
+      location: donation.location.address,
+      timestamp: new Date().toISOString(),
+      message: `New donation: ${donation.quantity} ${donation.unit} of ${donation.foodType}`
+    });
+    console.log('✅ Activity logged in Firebase (NoSQL)');
     
     return supabaseResult.id;
   } catch (error) {
-    console.error('❌ Error creating donation in Supabase:', error);
+    console.error('❌ Error creating donation:', error);
     throw error;
   }
 };
@@ -458,16 +468,13 @@ export const getDonationsByDonor = async (donorId: string, callback: (donations:
 
 // Requirement functions
 export const createRequirement = async (requirement: Omit<FoodRequirement, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
-  console.log('📋 Creating requirement - NO FALLBACK TO MOCK DATA:', requirement);
+  console.log('📋 Creating requirement - Dual database write:', requirement);
   
   try {
-    // First, save to Supabase (primary database)
-    console.log('💾 Saving requirement to Supabase...');
+    // 1. Save to Supabase (SQL - primary structured data)
+    console.log('💾 Saving requirement to Supabase PostgreSQL...');
     
-    // Ensure timestamps are in ISO format
     const neededBy = requirement.neededBy || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-    
-    console.log('⏰ Timestamp:', { neededBy });
     
     const supabaseData = {
       ngo_id: requirement.receiverId,
@@ -485,18 +492,15 @@ export const createRequirement = async (requirement: Omit<FoodRequirement, 'id' 
       status: 'active' as const,
     };
     
-    console.log('📤 Supabase data to insert:', supabaseData);
-    
     const supabaseResult = await requestService.create(supabaseData);
     
     if (!supabaseResult) {
-      console.error('❌ Supabase returned null - requirement not saved!');
-      throw new Error('Failed to save requirement to Supabase - received null response');
+      throw new Error('Failed to save requirement to Supabase');
     }
     
-    console.log('✅ Saved requirement to Supabase with ID:', supabaseResult.id);
+    console.log('✅ Saved to Supabase (SQL) with ID:', supabaseResult.id);
     
-    // Also save to Firebase for real-time updates (optional)
+    // 2. Save to Firebase Realtime Database (NoSQL - for real-time sync)
     const firebaseData: FoodRequirement = {
       ...requirement,
       id: supabaseResult.id,
@@ -504,17 +508,34 @@ export const createRequirement = async (requirement: Omit<FoodRequirement, 'id' 
       updatedAt: supabaseResult.created_at
     };
     
-    try {
-      const requirementsRef = ref(database, `requirements/${supabaseResult.id}`);
-      await set(requirementsRef, firebaseData);
-      console.log('✅ Synced requirement to Firebase for real-time updates');
-    } catch (firebaseError) {
-      console.warn('⚠️ Firebase sync failed (non-critical):', firebaseError);
-    }
+    const requirementsRef = ref(database, `requirements/${supabaseResult.id}`);
+    await set(requirementsRef, firebaseData);
+    console.log('✅ Synced to Firebase (NoSQL) for real-time updates');
+    
+    // 3. Create activity log in Firebase (NoSQL only - real-time feed)
+    const activityRef = ref(database, 'activity_feed');
+    const newActivityRef = push(activityRef);
+    await set(newActivityRef, {
+      id: newActivityRef.key,
+      type: 'requirement_created',
+      requirementId: supabaseResult.id,
+      receiverId: requirement.receiverId,
+      receiverName: requirement.receiverName,
+      organizationName: requirement.organizationName,
+      title: requirement.title,
+      foodType: requirement.foodType,
+      quantity: requirement.quantity,
+      unit: requirement.unit,
+      urgency: requirement.urgency,
+      location: requirement.location.address,
+      timestamp: new Date().toISOString(),
+      message: `New request: ${requirement.quantity} ${requirement.unit} of ${requirement.foodType} (${requirement.urgency} priority)`
+    });
+    console.log('✅ Activity logged in Firebase (NoSQL)');
     
     return supabaseResult.id;
   } catch (error) {
-    console.error('❌ Error creating requirement in Supabase:', error);
+    console.error('❌ Error creating requirement:', error);
     throw error;
   }
 };
@@ -584,14 +605,10 @@ export const getRequirementsByReceiver = async (receiverId: string, callback: (r
 
 // Match functions
 export const createMatch = async (match: Omit<Match, 'id' | 'createdAt' | 'updatedAt'>, actualQuantity?: number): Promise<string> => {
-  console.log('🤝 Creating match record (transactions table removed from DB):', match);
+  console.log('🤝 Creating match record in Firebase (NoSQL):', match);
   
   try {
-    // NOTE: The transactions table was removed in migration 003_optimize_schema.sql
-    // We now track completed donations via food_items status = 'collected'
-    // and fulfilled requests via requests status = 'fulfilled'
-    
-    // Just save to Firebase for real-time updates
+    // Save match to Firebase Realtime Database (NoSQL - real-time matching data)
     const matchesRef = ref(database, 'matches');
     const newMatchRef = push(matchesRef);
     
@@ -603,7 +620,25 @@ export const createMatch = async (match: Omit<Match, 'id' | 'createdAt' | 'updat
     };
     
     await set(newMatchRef, matchData);
-    console.log('✅ Match record created in Firebase with ID:', newMatchRef.key);
+    console.log('✅ Match record created in Firebase (NoSQL) with ID:', newMatchRef.key);
+    
+    // Create activity log in Firebase (NoSQL only)
+    const activityRef = ref(database, 'activity_feed');
+    const newActivityRef = push(activityRef);
+    await set(newActivityRef, {
+      id: newActivityRef.key,
+      type: 'match_created',
+      matchId: newMatchRef.key,
+      donationId: match.donationId,
+      requirementId: match.requirementId,
+      donorId: match.donorId,
+      receiverId: match.receiverId,
+      matchScore: match.matchScore,
+      distance: match.distance,
+      timestamp: new Date().toISOString(),
+      message: `AI matched donation with requirement (${match.matchScore}% match, ${match.distance}km distance)`
+    });
+    console.log('✅ Match activity logged in Firebase (NoSQL)');
     
     return newMatchRef.key!;
   } catch (error) {

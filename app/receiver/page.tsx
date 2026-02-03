@@ -27,6 +27,8 @@ import {
 import { ensureUserInSupabase } from '@/lib/user-service';
 import { MapMarker } from '@/components/map-component';
 import { toast } from 'sonner';
+import FoodTrustIndicator from '@/components/food-trust-indicator';
+import { useDemoItems, DemoExpiryBadge } from '@/hooks/use-demo-dates';
 
 // Lazy load heavy components
 const RequirementsForm = dynamic(() => import('@/components/requirements-form'), {
@@ -571,6 +573,18 @@ export default function ReceiverDashboard() {
                                   <Badge className={getStatusColor(donation.status)}>
                                     {donation.status === 'pending' ? '✅ Available' : donation.status}
                                   </Badge>
+                                  {/* Trust Score Indicator */}
+                                  <FoodTrustIndicator
+                                    foodItem={{
+                                      id: donation.id || '',
+                                      donor_id: donation.donorId,
+                                      food_type: donation.foodType,
+                                      pickup_time: donation.pickupTime,
+                                      expiry_date: donation.expiryDate,
+                                      created_at: donation.createdAt,
+                                    }}
+                                    compact
+                                  />
                                 </div>
                                 <p className="text-sm text-gray-600 font-medium mb-3">{donation.donorName}</p>
                                 <div className="flex flex-wrap items-center gap-2 mt-3">

@@ -15,7 +15,7 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { createRequirement } from '@/lib/firebase-service';
 import { ensureUserInSupabase } from '@/lib/user-service';
-import { initializeAutocomplete, Location } from '@/lib/maps';
+import { initializeAutocomplete, geocodeAddress, Location } from '@/lib/maps';
 import { toast } from 'sonner';
 import GoogleMapsLoader from '@/components/google-maps-loader';
 
@@ -40,6 +40,7 @@ export default function RequirementsForm({ onSuccess }: RequirementsFormProps) {
   });
   const [loading, setLoading] = useState(false);
   const [autocomplete, setAutocomplete] = useState<any>(null);
+  const [mapsAvailable, setMapsAvailable] = useState<boolean | null>(null);
 
   // Load form data from localStorage on component mount
   useEffect(() => {
@@ -62,15 +63,28 @@ export default function RequirementsForm({ onSuccess }: RequirementsFormProps) {
   // Initialize Google Places Autocomplete
   useEffect(() => {
     if (addressInputRef.current && !autocomplete) {
-      const newAutocomplete = initializeAutocomplete(addressInputRef.current, (location) => {
+      initializeAutocomplete(addressInputRef.current, (location) => {
         console.log('Location selected:', location);
         setFormData(prev => ({ ...prev, location }));
+      }).then((result) => {
+        setAutocomplete(result);
+        setMapsAvailable(result?.isAvailable !== false);
       });
-      setAutocomplete(newAutocomplete);
     }
     // We only want this to run once, so we pass an empty dependency array.
     // The `autocomplete` state is used to ensure it's only initialized once.
   }, [autocomplete]);
+
+  // Handle manual address entry when Google Maps is unavailable
+  const handleManualAddressSubmit = async () => {
+    if (addressInputRef.current && addressInputRef.current.value.trim()) {
+      const address = addressInputRef.current.value.trim();
+      const location = await geocodeAddress(address);
+      if (location) {
+        setFormData(prev => ({ ...prev, location }));
+      }
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -324,15 +338,26 @@ export default function RequirementsForm({ onSuccess }: RequirementsFormProps) {
                 <Input
                   ref={addressInputRef}
                   id="location"
-                  placeholder="Start typing to see address suggestions..."
+                  placeholder={mapsAvailable === false ? "Enter your full address..." : "Start typing to see address suggestions..."}
                   className="pl-10"
                   required
                   disabled={loading}
+                  onBlur={mapsAvailable === false ? handleManualAddressSubmit : undefined}
+                  onKeyDown={mapsAvailable === false ? (e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleManualAddressSubmit();
+                    }
+                  } : undefined}
                 />
               </div>
-              <p className="text-xs text-gray-500">Type an address and select from the dropdown that appears</p>
+              {mapsAvailable === false ? (
+                <p className="text-xs text-amber-600">Please enter your full address and press Enter</p>
+              ) : (
+                <p className="text-xs text-gray-500">Type an address and select from the dropdown that appears</p>
+              )}
               {formData.location && (
-                <p className="text-sm text-green-600">✓ Location confirmed: {formData.location.address}</p>
+                <p className="text-sm text-green-600">Location confirmed: {formData.location.address}</p>
               )}
             </div>
             <div className="space-y-2">

@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MapPin, Search, Loader2 } from 'lucide-react';
+import HotspotOverlay from '@/components/hotspot-overlay';
 
 // Declare global Google Maps types
 declare global {
@@ -31,13 +32,16 @@ interface MapComponentProps {
   center?: { lat: number; lng: number };
   onMarkerClick?: (marker: MapMarker) => void;
   showFilters?: boolean;
+  /** Show hunger hotspot prediction overlay */
+  showHotspots?: boolean;
 }
 
 export default function MapComponent({ 
   markers = [], 
   center = { lat: 12.9716, lng: 77.5946 }, // Default to Bangalore, India
   onMarkerClick,
-  showFilters = true
+  showFilters = true,
+  showHotspots = true
 }: MapComponentProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<any>(null);
@@ -53,17 +57,19 @@ export default function MapComponent({
   const [manualZoom, setManualZoom] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  // Check for API key
+  // Check if Google Maps is disabled or no API key
+  const isDisabled = process.env.NEXT_PUBLIC_DISABLE_GOOGLE_MAPS === 'true';
   const hasApiKey = Boolean(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY && 
                      process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY !== 'YOUR_GOOGLE_MAPS_API_KEY' &&
                      process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY.trim() !== '');
+  const mapsUnavailable = isDisabled || !hasApiKey;
 
   // Load Google Maps
   useEffect(() => {
-    if (typeof window !== 'undefined' && (window as any).google?.maps) {
+    if (!mapsUnavailable && typeof window !== 'undefined' && (window as any).google?.maps) {
       setGoogleMapsLoaded(true);
     }
-  }, []);
+  }, [mapsUnavailable]);
 
   // Initialize map
   useEffect(() => {
@@ -394,33 +400,99 @@ export default function MapComponent({
           )}
         </CardHeader>
         <CardContent>
-          {!hasApiKey ? (
-            <div className="w-full h-96 rounded-lg border bg-yellow-50 flex items-center justify-center">
-              <div className="text-center p-8">
-                <MapPin className="h-12 w-12 text-yellow-600 mx-auto mb-4" />
-                <p className="text-yellow-800 font-semibold mb-2">Google Maps API Key Required</p>
-                <p className="text-sm text-yellow-700">
-                  Please add your Google Maps API key to the environment variables.
-                </p>
+          {mapsUnavailable || loadError ? (
+            // Fallback: Static map placeholder with marker list
+            <div className="w-full">
+              {/* Static Map Placeholder */}
+              <div className="w-full h-64 rounded-lg border bg-gradient-to-br from-blue-50 to-green-50 relative overflow-hidden">
+                {/* Grid pattern to simulate map */}
+                <div className="absolute inset-0 opacity-20">
+                  <svg width="100%" height="100%">
+                    <defs>
+                      <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+                        <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#94a3b8" strokeWidth="0.5"/>
+                      </pattern>
+                    </defs>
+                    <rect width="100%" height="100%" fill="url(#grid)" />
+                  </svg>
+                </div>
+                
+                {/* Map placeholder content */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-4">
+                  <div className="bg-white/90 backdrop-blur-sm rounded-xl p-6 shadow-lg max-w-md">
+                    <MapPin className="h-10 w-10 text-blue-600 mx-auto mb-3" />
+                    <p className="text-gray-800 font-semibold mb-1">Map View Unavailable</p>
+                    <p className="text-sm text-gray-600 mb-3">
+                      {isDisabled 
+                        ? "Google Maps is currently disabled" 
+                        : !hasApiKey 
+                          ? "Google Maps API key not configured" 
+                          : "Unable to load Google Maps at this time"}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Locations are listed below for your reference
+                    </p>
+                  </div>
+                </div>
+                
+                {/* Decorative markers on the placeholder */}
+                {markers.slice(0, 5).map((marker, idx) => (
+                  <div
+                    key={marker.id}
+                    className="absolute"
+                    style={{
+                      left: `${20 + (idx * 15) + Math.random() * 10}%`,
+                      top: `${20 + (idx * 12) + Math.random() * 10}%`,
+                    }}
+                  >
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center shadow-md ${
+                      marker.type === 'donor' ? 'bg-green-500' : 'bg-blue-500'
+                    }`}>
+                      <MapPin className="h-3 w-3 text-white" />
+                    </div>
+                  </div>
+                ))}
               </div>
-            </div>
-          ) : loadError ? (
-            <div className="w-full h-96 rounded-lg border bg-red-50 flex items-center justify-center">
-              <div className="text-center p-8">
-                <MapPin className="h-12 w-12 text-red-600 mx-auto mb-4" />
-                <p className="text-red-800 font-semibold mb-2">Failed to Load Google Maps</p>
-                <p className="text-sm text-red-700">
-                  Please check your API key and internet connection.
-                </p>
-                <Button 
-                  onClick={() => window.location.reload()} 
-                  variant="outline" 
-                  size="sm" 
-                  className="mt-4"
-                >
-                  Retry
-                </Button>
-              </div>
+
+              {/* Markers List */}
+              {markers.length > 0 ? (
+                <div className="mt-4 space-y-2 max-h-64 overflow-y-auto">
+                  <p className="text-sm font-medium text-gray-700 mb-2">
+                    {markers.length} Location{markers.length !== 1 ? 's' : ''} Available:
+                  </p>
+                  {markers.map((marker) => (
+                    <div 
+                      key={marker.id}
+                      className={`p-3 rounded-lg border cursor-pointer transition-colors hover:bg-gray-50 ${
+                        marker.type === 'donor' 
+                          ? 'border-green-200 bg-green-50/50' 
+                          : 'border-blue-200 bg-blue-50/50'
+                      }`}
+                      onClick={() => onMarkerClick?.(marker)}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                          marker.type === 'donor' ? 'bg-green-500' : 'bg-blue-500'
+                        }`}>
+                          <MapPin className="h-4 w-4 text-white" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-gray-900 truncate">{marker.info.name}</p>
+                          <p className="text-sm text-gray-600 truncate">{marker.info.description}</p>
+                          <p className="text-xs text-gray-400 mt-1">
+                            {marker.type === 'donor' ? 'Food Donor' : 'Food Receiver'} • 
+                            Lat: {marker.position.lat.toFixed(4)}, Lng: {marker.position.lng.toFixed(4)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="mt-4 p-4 bg-gray-50 rounded-lg text-center">
+                  <p className="text-gray-500 text-sm">No locations to display yet</p>
+                </div>
+              )}
             </div>
           ) : !googleMapsLoaded ? (
             <div className="w-full h-96 rounded-lg border bg-gray-50 flex items-center justify-center">
@@ -444,6 +516,16 @@ export default function MapComponent({
               </span>
             )}
           </div>
+          
+          {/* Hunger Hotspot Prediction Overlay - only show with working map */}
+          {showHotspots && map && googleMapsLoaded && !mapsUnavailable && !loadError && (
+            <div className="mt-4">
+              <HotspotOverlay 
+                map={map} 
+                initiallyVisible={false}
+              />
+            </div>
+          )}
         </CardContent>
       </Card>
     </>

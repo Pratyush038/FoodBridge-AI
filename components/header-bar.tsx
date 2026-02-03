@@ -14,6 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
+import { DemoModePopover } from '@/components/demo-mode-toggle';
 
 export default function HeaderBar() {
   const { data: session, update: updateSession } = useSession();
@@ -110,6 +111,11 @@ export default function HeaderBar() {
             ? (scrolled ? 'text-gray-700 hover:text-green-600' : 'text-green-50 hover:text-white') 
             : 'text-gray-700 hover:text-green-600'
         }`}>About Us</Link>
+        <Link href="/demo" className={`text-base font-semibold transition-all duration-200 px-3 py-1 rounded-md focus:outline-none focus:ring-2 focus:ring-green-400/50 ${
+          isLanding 
+            ? (scrolled ? 'text-gray-700 hover:text-green-600' : 'text-green-50 hover:text-white') 
+            : 'text-gray-700 hover:text-green-600'
+        }`}>Demo</Link>
         {session?.user && (
           <Link href="/chat" className={`text-base font-semibold transition-all duration-200 px-3 py-1 rounded-md focus:outline-none focus:ring-2 focus:ring-green-400/50 flex items-center gap-2 ${
             isLanding 
@@ -120,6 +126,8 @@ export default function HeaderBar() {
             AI Chat
           </Link>
         )}
+        {/* Demo Mode Toggle - for presentations */}
+        <DemoModePopover className={isLanding && !scrolled ? 'text-white' : ''} />
       </div>
 
       {/* User Profile & Role Switcher */}

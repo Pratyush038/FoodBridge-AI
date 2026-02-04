@@ -19,6 +19,8 @@ import { ensureUserInSupabase } from '@/lib/user-service';
 import { geocodeAddress, initializeAutocomplete, Location } from '@/lib/maps';
 import { toast } from 'sonner';
 import GoogleMapsLoader from '@/components/google-maps-loader';
+import AIMatchResults from '@/components/ai-match-results';
+import { findMatchingReceivers, MatchResult } from '@/lib/donor-receiver-matching';
 
 interface FoodUploadFormProps {
   onSuccess?: () => void;
@@ -41,6 +43,11 @@ export default function FoodUploadForm({ onSuccess }: FoodUploadFormProps) {
   const [loading, setLoading] = useState(false);
   const [autocomplete, setAutocomplete] = useState<any>(null);
   const [mapsAvailable, setMapsAvailable] = useState<boolean | null>(null);
+  
+  // AI Matching state
+  const [matchResults, setMatchResults] = useState<MatchResult[]>([]);
+  const [showMatches, setShowMatches] = useState(false);
+  const [isMatchingLoading, setIsMatchingLoading] = useState(false);
 
   // Load form data from localStorage on component mount
   useEffect(() => {
@@ -156,18 +163,18 @@ export default function FoodUploadForm({ onSuccess }: FoodUploadFormProps) {
         pickupTimeISO = new Date().toISOString();
       }
 
-      // Create donation object
+      // Create donation object - use empty string for imageUrl if no image (Firebase compatible)
       const donation = {
         donorId: finalDonorId,
         donorName: session.user.name || 'Anonymous Donor',
         foodType: formData.foodType,
         quantity: formData.quantity,
         unit: formData.unit,
-        description: formData.description,
+        description: formData.description || '',
         location: formData.location!, // We've already validated this is not null
         pickupTime: pickupTimeISO,
         expiryDate: formData.expiryDate?.toISOString() || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-        imageUrl: imagePreview || undefined,
+        imageUrl: imagePreview || '',
         status: 'pending' as const
       };
 
@@ -177,6 +184,31 @@ export default function FoodUploadForm({ onSuccess }: FoodUploadFormProps) {
       const donationId = await createDonation(donation);
       
       console.log('✅ Donation created with ID:', donationId);
+      
+      // Run AI matching to find nearby receivers
+      setIsMatchingLoading(true);
+      setShowMatches(true);
+      
+      // Find matching receivers based on donation details
+      const matches = findMatchingReceivers({
+        foodType: formData.foodType,
+        quantity: parseFloat(formData.quantity) || 0,
+        unit: formData.unit,
+        latitude: formData.location!.lat,
+        longitude: formData.location!.lng,
+        expiryDate: formData.expiryDate?.toISOString(),
+        pickupTime: pickupTimeISO,
+      });
+      
+      setMatchResults(matches);
+      setIsMatchingLoading(false);
+      
+      // Store donation details for reference before clearing
+      const donationSummary = {
+        foodType: formData.foodType,
+        quantity: formData.quantity,
+        unit: formData.unit,
+      };
       
       // Reset form
       setFormData({
@@ -201,7 +233,7 @@ export default function FoodUploadForm({ onSuccess }: FoodUploadFormProps) {
 
       // Show success message with more details
       toast.success(`🎉 Donation Posted Successfully!`, {
-        description: `${formData.quantity} ${formData.unit} of ${formData.foodType} has been posted to Supabase and is now visible to organizations in need.`,
+        description: `${donationSummary.quantity} ${donationSummary.unit} of ${donationSummary.foodType} has been posted. Check the AI matches below!`,
         duration: 5000,
       });
       
@@ -418,6 +450,21 @@ export default function FoodUploadForm({ onSuccess }: FoodUploadFormProps) {
             )}
           </Button>
         </form>
+        
+        {/* AI Matching Results - Shows after successful donation */}
+        {showMatches && (
+          <AIMatchResults
+            matches={matchResults}
+            type="receivers"
+            isLoading={isMatchingLoading}
+            onContactClick={(match) => {
+              toast.info(`Contact ${match.organizationName || match.name}`, {
+                description: `Phone: ${match.phone || 'Not available'}`,
+                duration: 5000,
+              });
+            }}
+          />
+        )}
       </CardContent>
     </Card>
     </GoogleMapsLoader>

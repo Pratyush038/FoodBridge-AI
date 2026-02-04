@@ -18,6 +18,8 @@ import { ensureUserInSupabase } from '@/lib/user-service';
 import { initializeAutocomplete, geocodeAddress, Location } from '@/lib/maps';
 import { toast } from 'sonner';
 import GoogleMapsLoader from '@/components/google-maps-loader';
+import AIMatchResults from '@/components/ai-match-results';
+import { findMatchingDonors, MatchResult } from '@/lib/donor-receiver-matching';
 
 interface RequirementsFormProps {
   onSuccess?: () => void;
@@ -41,6 +43,11 @@ export default function RequirementsForm({ onSuccess }: RequirementsFormProps) {
   const [loading, setLoading] = useState(false);
   const [autocomplete, setAutocomplete] = useState<any>(null);
   const [mapsAvailable, setMapsAvailable] = useState<boolean | null>(null);
+  
+  // AI Matching state
+  const [matchResults, setMatchResults] = useState<MatchResult[]>([]);
+  const [showMatches, setShowMatches] = useState(false);
+  const [isMatchingLoading, setIsMatchingLoading] = useState(false);
 
   // Load form data from localStorage on component mount
   useEffect(() => {
@@ -165,6 +172,32 @@ export default function RequirementsForm({ onSuccess }: RequirementsFormProps) {
       
       console.log('✅ Requirement created with ID:', requirementId);
       
+      // Run AI matching to find nearby donors
+      setIsMatchingLoading(true);
+      setShowMatches(true);
+      
+      // Find matching donors based on requirement details
+      const matches = findMatchingDonors({
+        foodType: formData.foodType,
+        quantity: parseFloat(formData.quantity) || 0,
+        unit: formData.unit,
+        latitude: formData.location!.lat,
+        longitude: formData.location!.lng,
+        neededBy: neededByISO,
+        urgency: formData.urgency as 'high' | 'medium' | 'low',
+      });
+      
+      setMatchResults(matches);
+      setIsMatchingLoading(false);
+      
+      // Store requirement details for reference before clearing
+      const requirementSummary = {
+        foodType: formData.foodType,
+        quantity: formData.quantity,
+        unit: formData.unit,
+        organizationName: formData.organizationName,
+      };
+      
       // Reset form
       setFormData({
         title: '',
@@ -189,7 +222,7 @@ export default function RequirementsForm({ onSuccess }: RequirementsFormProps) {
 
       // Show success message with more details
       toast.success(`Requirement Posted Successfully!`, {
-        description: `${formData.quantity} ${formData.unit} of ${formData.foodType} needed by ${formData.organizationName} is now visible to donors in Supabase.`,
+        description: `${requirementSummary.quantity} ${requirementSummary.unit} of ${requirementSummary.foodType} needed by ${requirementSummary.organizationName}. Check the AI matches below!`,
         duration: 5000,
       });
       
@@ -418,6 +451,21 @@ export default function RequirementsForm({ onSuccess }: RequirementsFormProps) {
             )}
           </Button>
         </form>
+        
+        {/* AI Matching Results - Shows after successful requirement posting */}
+        {showMatches && (
+          <AIMatchResults
+            matches={matchResults}
+            type="donors"
+            isLoading={isMatchingLoading}
+            onContactClick={(match) => {
+              toast.info(`Contact ${match.organizationName || match.name}`, {
+                description: `Phone: ${match.phone || 'Not available'}`,
+                duration: 5000,
+              });
+            }}
+          />
+        )}
       </CardContent>
     </Card>
     </GoogleMapsLoader>

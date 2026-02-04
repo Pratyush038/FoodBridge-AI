@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,7 +15,7 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { createRequirement } from '@/lib/firebase-service';
 import { ensureUserInSupabase } from '@/lib/user-service';
-import { initializeAutocomplete, geocodeAddress, Location } from '@/lib/maps';
+import { Location } from '@/lib/maps';
 import { toast } from 'sonner';
 import GoogleMapsLoader from '@/components/google-maps-loader';
 import AIMatchResults from '@/components/ai-match-results';
@@ -27,7 +27,6 @@ interface RequirementsFormProps {
 
 export default function RequirementsForm({ onSuccess }: RequirementsFormProps) {
   const { data: session } = useSession();
-  const addressInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState({
     title: '',
     foodType: '',
@@ -41,8 +40,7 @@ export default function RequirementsForm({ onSuccess }: RequirementsFormProps) {
     organizationName: ''
   });
   const [loading, setLoading] = useState(false);
-  const [autocomplete, setAutocomplete] = useState<any>(null);
-  const [mapsAvailable, setMapsAvailable] = useState<boolean | null>(null);
+  const [addressInput, setAddressInput] = useState('');
   
   // AI Matching state
   const [matchResults, setMatchResults] = useState<MatchResult[]>([]);
@@ -67,29 +65,21 @@ export default function RequirementsForm({ onSuccess }: RequirementsFormProps) {
     localStorage.setItem('requirementsFormData', JSON.stringify(formData));
   }, [formData]);
 
-  // Initialize Google Places Autocomplete
-  useEffect(() => {
-    if (addressInputRef.current && !autocomplete) {
-      initializeAutocomplete(addressInputRef.current, (location) => {
-        console.log('Location selected:', location);
-        setFormData(prev => ({ ...prev, location }));
-      }).then((result) => {
-        setAutocomplete(result);
-        setMapsAvailable(result?.isAvailable !== false);
-      });
-    }
-    // We only want this to run once, so we pass an empty dependency array.
-    // The `autocomplete` state is used to ensure it's only initialized once.
-  }, [autocomplete]);
-
-  // Handle manual address entry when Google Maps is unavailable
-  const handleManualAddressSubmit = async () => {
-    if (addressInputRef.current && addressInputRef.current.value.trim()) {
-      const address = addressInputRef.current.value.trim();
-      const location = await geocodeAddress(address);
-      if (location) {
-        setFormData(prev => ({ ...prev, location }));
-      }
+  // Handle manual address entry
+  const handleAddressChange = (value: string) => {
+    setAddressInput(value);
+    if (value.trim()) {
+      // Create a location object with the address (using default coordinates)
+      setFormData(prev => ({
+        ...prev,
+        location: {
+          address: value.trim(),
+          lat: 0,
+          lng: 0
+        }
+      }));
+    } else {
+      setFormData(prev => ({ ...prev, location: null }));
     }
   };
 
@@ -176,13 +166,19 @@ export default function RequirementsForm({ onSuccess }: RequirementsFormProps) {
       setIsMatchingLoading(true);
       setShowMatches(true);
       
+      // Default location for AI matching: RV College, Bangalore, Mysore Road
+      const defaultMatchingLocation = {
+        lat: 12.9236,
+        lng: 77.4989
+      };
+      
       // Find matching donors based on requirement details
       const matches = findMatchingDonors({
         foodType: formData.foodType,
         quantity: parseFloat(formData.quantity) || 0,
         unit: formData.unit,
-        latitude: formData.location!.lat,
-        longitude: formData.location!.lng,
+        latitude: formData.location?.lat || defaultMatchingLocation.lat,
+        longitude: formData.location?.lng || defaultMatchingLocation.lng,
         neededBy: neededByISO,
         urgency: formData.urgency as 'high' | 'medium' | 'low',
       });
@@ -213,9 +209,7 @@ export default function RequirementsForm({ onSuccess }: RequirementsFormProps) {
       });
       
       // Clear address input
-      if (addressInputRef.current) {
-        addressInputRef.current.value = '';
-      }
+      setAddressInput('');
 
       // Clear saved form data
       localStorage.removeItem('requirementsFormData');
@@ -369,28 +363,18 @@ export default function RequirementsForm({ onSuccess }: RequirementsFormProps) {
               <div className="relative">
                 <MapPin className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
-                  ref={addressInputRef}
                   id="location"
-                  placeholder={mapsAvailable === false ? "Enter your full address..." : "Start typing to see address suggestions..."}
+                  placeholder="Enter your full address..."
                   className="pl-10"
+                  value={addressInput}
+                  onChange={(e) => handleAddressChange(e.target.value)}
                   required
                   disabled={loading}
-                  onBlur={mapsAvailable === false ? handleManualAddressSubmit : undefined}
-                  onKeyDown={mapsAvailable === false ? (e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleManualAddressSubmit();
-                    }
-                  } : undefined}
                 />
               </div>
-              {mapsAvailable === false ? (
-                <p className="text-xs text-amber-600">Please enter your full address and press Enter</p>
-              ) : (
-                <p className="text-xs text-gray-500">Type an address and select from the dropdown that appears</p>
-              )}
+              <p className="text-xs text-gray-500">Enter your complete pickup/delivery address</p>
               {formData.location && (
-                <p className="text-sm text-green-600">Location confirmed: {formData.location.address}</p>
+                <p className="text-sm text-green-600">✓ Address entered</p>
               )}
             </div>
             <div className="space-y-2">

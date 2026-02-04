@@ -50,9 +50,9 @@ export default function DonorDashboard() {
   const stats = useMemo(() => {
     const now = new Date();
     
-    // Active donations (not yet completed/expired)
+    // Active donations (not yet completed/expired) - include 'available' status too
     const activeDonations = donations.filter(d => 
-      d.status === 'pending' || d.status === 'matched'
+      d.status === 'pending' || d.status === 'matched' || d.status === 'available' || d.status === 'picked_up'
     ).length;
     
     // Completed donations this month - use matchedAt if available, otherwise createdAt
@@ -273,6 +273,38 @@ export default function DonorDashboard() {
     fetchDonorData();
   };
 
+  const handleGenerateDemoData = async () => {
+    if (!donorId) {
+      toast.error('Please wait for your account to load...');
+      return;
+    }
+
+    toast.loading('Generating demo donations...', { id: 'demo-data' });
+    try {
+      const response = await fetch('/api/assign-mock-donations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ donorId })
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok) {
+        toast.success(`Demo data created! ${result.activeCount} active, ${result.completedCount} completed donations`, { 
+          id: 'demo-data',
+          duration: 5000 
+        });
+        // Refresh the donations data
+        fetchDonorData();
+      } else {
+        toast.error(result.error || 'Failed to create demo data', { id: 'demo-data' });
+      }
+    } catch (error) {
+      console.error('Error generating demo data:', error);
+      toast.error('Failed to generate demo data', { id: 'demo-data' });
+    }
+  };
+
   const handleContactOrganization = (requirement: FoodRequirement) => {
     setSelectedRequirement(requirement);
     setShowContactModal(true);
@@ -437,8 +469,21 @@ export default function DonorDashboard() {
       <div className="min-h-screen bg-gray-50 pt-16">
         <HeaderBar />
         <div className="container mx-auto p-4 md:p-6 lg:p-8 max-w-7xl">
-          <h1 className="text-4xl font-bold mb-2 tracking-tight text-gray-900">Donor Dashboard</h1>
-          <p className="text-gray-600 mb-8 text-lg">Share your surplus food and make an impact</p>
+          <div className="flex justify-between items-start mb-2">
+            <div>
+              <h1 className="text-4xl font-bold tracking-tight text-gray-900">Donor Dashboard</h1>
+              <p className="text-gray-600 mb-8 text-lg">Share your surplus food and make an impact</p>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleGenerateDemoData}
+              className="text-xs"
+            >
+              <Plus className="h-3 w-3 mr-1" />
+              Add Demo Data
+            </Button>
+          </div>
           
           <div className="space-y-8">
             {/* Stats Overview */}

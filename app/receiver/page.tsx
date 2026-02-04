@@ -65,7 +65,7 @@ export default function ReceiverDashboard() {
     
     // Available donations nearby (can pick up)
     const availableNearby = availableDonations.filter(d => 
-      d.status === 'pending'
+      d.status === 'pending' || d.status === 'available'
     ).length;
     
     // Urgent needs - donations expiring soon (within 24 hours) that need immediate pickup
@@ -571,7 +571,7 @@ export default function ReceiverDashboard() {
                                 <div className="flex items-center space-x-2 mb-3">
                                   <h4 className="font-bold text-gray-900 text-lg tracking-tight group-hover:text-green-600 transition-colors">{donation.foodType}</h4>
                                   <Badge className={getStatusColor(donation.status)}>
-                                    {donation.status === 'pending' ? '✅ Available' : donation.status}
+                                    {(donation.status === 'pending' || donation.status === 'available') ? '✅ Available' : donation.status}
                                   </Badge>
                                   {/* Trust Score Indicator */}
                                   <FoodTrustIndicator

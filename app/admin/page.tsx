@@ -68,7 +68,7 @@ export default function AdminDashboard() {
 
     const systemStats = {
       totalUsers: new Set([...donations.map(d => d.donorId), ...requirements.map(r => r.receiverId)]).size,
-      activeDonations: filteredDonations.filter(d => d.status === 'pending').length,
+      activeDonations: filteredDonations.filter(d => d.status === 'pending' || d.status === 'available' || d.status === 'picked_up').length,
       matchingRate: filteredDonations.length > 0 ? 
         (filteredDonations.filter(d => d.status === 'matched' || d.status === 'completed').length / filteredDonations.length * 100) : 0,
       wasteReduction: filteredDonations.reduce((acc, d) => acc + parseFloat(d.quantity) || 0, 0) / 1000

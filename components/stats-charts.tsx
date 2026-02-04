@@ -39,7 +39,7 @@ export default function StatsCharts({ donations, requirements, matches }: StatsC
   const statusData = [
     {
       name: 'Pending',
-      donations: donations.filter(d => d.status === 'pending').length,
+      donations: donations.filter(d => d.status === 'pending' || d.status === 'available').length,
       requirements: requirements.filter(r => r.status === 'active').length,
     },
     {

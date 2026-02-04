@@ -16,6 +16,31 @@ export async function POST(req: NextRequest) {
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey);
+    
+    // Check if we should clear existing data (add ?clear=true to URL)
+    const url = new URL(req.url);
+    const shouldClear = url.searchParams.get('clear') === 'true';
+    
+    if (shouldClear) {
+      console.log('🗑️ Clearing existing mock data...');
+      
+      // Delete ALL food_items and requests first (they have foreign keys)
+      const { error: foodError } = await supabase.from('food_items').delete().gte('id', '00000000-0000-0000-0000-000000000000');
+      if (foodError) console.log('Food items delete:', foodError.message);
+      
+      const { error: reqError } = await supabase.from('requests').delete().gte('id', '00000000-0000-0000-0000-000000000000');
+      if (reqError) console.log('Requests delete:', reqError.message);
+      
+      // Then delete mock donors and ngos (using their specific ID patterns)
+      const { error: donorError } = await supabase.from('donors').delete().like('id', '00000000-0000-0000-0000-%');
+      if (donorError) console.log('Donors delete:', donorError.message);
+      
+      const { error: ngoError } = await supabase.from('ngos').delete().like('id', '00000000-0000-0000-0001-%');
+      if (ngoError) console.log('NGOs delete:', ngoError.message);
+      
+      console.log('✅ Existing mock data cleared');
+    }
+    
     const result = await seedMockData(supabase);
 
     if (result.success) {

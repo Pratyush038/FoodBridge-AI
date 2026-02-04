@@ -31,7 +31,7 @@ export interface FoodDonation {
   pickupTime: string;
   expiryDate: string;
   imageUrl?: string;
-  status: 'pending' | 'matched' | 'completed' | 'expired';
+  status: 'pending' | 'matched' | 'completed' | 'expired' | 'available' | 'picked_up' | 'reserved' | 'collected';
   matchedWith?: string;
   matchedAt?: string;
   createdAt: string;

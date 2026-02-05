@@ -179,13 +179,19 @@ export default function FoodUploadForm({ onSuccess }: FoodUploadFormProps) {
       setIsMatchingLoading(true);
       setShowMatches(true);
       
+      // Default location for AI matching: RV College, Bangalore, Mysore Road
+      const defaultMatchingLocation = {
+        lat: 12.9236,
+        lng: 77.4989
+      };
+      
       // Find matching receivers based on donation details
       const matches = findMatchingReceivers({
         foodType: formData.foodType,
         quantity: parseFloat(formData.quantity) || 0,
         unit: formData.unit,
-        latitude: formData.location!.lat,
-        longitude: formData.location!.lng,
+        latitude: formData.location?.lat || defaultMatchingLocation.lat,
+        longitude: formData.location?.lng || defaultMatchingLocation.lng,
         expiryDate: formData.expiryDate?.toISOString(),
         pickupTime: pickupTimeISO,
       });
